@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="description" content="Smart Campus Navigator - find classrooms, labs, offices and facilities.">
+  
+  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+*{box-sizing:border-box}html,body{margin:0;padding:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6f8fc;color:#111827}body{padding-bottom:78px}.topbar{height:72px;background:#0f172a;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 max(18px,calc((100% - 1180px)/2));position:sticky;top:0;z-index:1000}.brand{display:flex;align-items:center;gap:11px;cursor:pointer}.brand-mark{width:40px;height:40px;border-radius:12px;object-fit:cover;background:#fff;padding:3px;display:block}.campus-media{margin:30px 0}.media-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.media-card{background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;cursor:pointer}.media-card img,.media-card video{width:100%;height:190px;object-fit:cover;display:block}.media-card-body{padding:12px 14px}.media-card-body b{display:block;font-size:14px}.media-card-body span{display:block;color:#64748b;font-size:12px;margin-top:4px;line-height:1.4}.media-gallery{margin:18px 0}.media-gallery h3{margin:0 0 10px;font-size:18px}.gallery-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.gallery-grid figure{margin:0;background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden}.gallery-grid img,.gallery-grid video{width:100%;height:220px;object-fit:cover;display:block}.gallery-grid figcaption{padding:9px 11px;font-size:11px;color:#64748b}.video-badge{position:relative}.video-badge:after{content:"▶ Video";position:absolute;left:10px;top:10px;background:#0f172acc;color:#fff;border-radius:999px;padding:5px 8px;font-size:10px;font-weight:800}.college-photo{width:100%;height:220px;object-fit:cover;border-radius:18px;margin:14px 0 0}.detail-actions{flex-wrap:wrap}@media(max-width:760px){.media-grid{grid-template-columns:1fr 1fr}.media-card img,.media-card video{height:150px}.gallery-grid{grid-template-columns:1fr}.gallery-grid img,.gallery-grid video{height:210px}}.brand strong{display:block;font-size:15px}.brand small{display:block;color:#94a3b8;font-size:11px;margin-top:2px}.top-actions{display:flex;gap:7px}.icon-btn{border:0;background:#1e293b;color:#e2e8f0;border-radius:10px;width:40px;height:40px;font-size:19px;cursor:pointer}.page{display:none;max-width:1180px;margin:auto;padding:28px 18px}.page.active{display:block}
+.hero-aerial{position:relative;min-height:390px;padding:0!important;isolation:isolate;background:#07111f;box-shadow:0 18px 45px #0f172a22}
+.hero-aerial-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-3;filter:saturate(1.08) contrast(1.03);transform:scale(1.01);animation:campusDrift 14s ease-in-out infinite alternate}
+.hero-aerial-overlay{position:absolute;inset:0;z-index:-2;background:linear-gradient(90deg,#020617e8 0%,#020617a8 42%,#02061735 75%,#02061720 100%),linear-gradient(0deg,#02061788,#02061708)}
+.hero-content{position:relative;z-index:2;padding:42px 34px;max-width:720px}
+.hero-content h1{font-size:clamp(34px,5vw,58px);line-height:1.02;margin:10px 0;color:#fff}
+.hero-content p{color:#dbeafe;max-width:620px;line-height:1.65}
+.hero-map-btn{margin-top:10px;border:0;background:#2563eb;color:#fff;border-radius:11px;padding:12px 17px;font-weight:800;cursor:pointer;box-shadow:0 8px 24px #0005}
+.hero-flyover-badge{position:absolute;right:20px;bottom:20px;z-index:3;background:#020617b8;color:#fff;border:1px solid #ffffff30;backdrop-filter:blur(8px);padding:9px 12px;border-radius:999px;font-size:10px;font-weight:800;letter-spacing:.7px}
+.pulse-dot{display:inline-block;width:8px;height:8px;background:#22c55e;border-radius:50%;margin-right:6px;box-shadow:0 0 0 0 #22c55e;animation:pulse 1.8s infinite}
+@keyframes pulse{70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@keyframes campusDrift{from{transform:scale(1.02) translate3d(0,0,0)}to{transform:scale(1.08) translate3d(-1.5%, -1%, 0)}}
+@media(max-width:760px){.hero-aerial{min-height:410px}.hero-content{padding:30px 21px}.hero-flyover-badge{left:20px;right:auto;bottom:18px}.hero-aerial-video{animation:none;transform:scale(1.04)}}
+.hero{background:linear-gradient(135deg,#0f172a,#1e293b);border-radius:24px;color:white;padding:35px 30px;display:flex;justify-content:space-between;align-items:center;overflow:hidden}.eyebrow{font-size:11px;font-weight:800;letter-spacing:1.7px;color:#64748b}.hero .eyebrow{color:#38bdf8}.hero h1{font-size:clamp(32px,5vw,52px);line-height:1.03;margin:10px 0}.hero h1 span{color:#38bdf8}.hero p{color:#cbd5e1;max-width:560px;line-height:1.6}.hero-icon{font-size:110px;opacity:.18;margin-right:30px}.search-box{background:white;border:1px solid #e2e8f0;border-radius:14px;display:flex;align-items:center;padding:6px 7px;margin:18px 0;box-shadow:0 7px 22px #0f172a0a}.search-box.large{margin-top:-28px;position:relative;margin-left:5%;margin-right:5%;padding:8px 9px}.search-box>span{font-size:22px;padding:0 10px;color:#64748b}.search-box input{border:0;outline:0;flex:1;font-size:15px;padding:13px;background:transparent;min-width:0}.search-box button,.primary-btn{background:#2563eb;color:white;border:0;border-radius:10px;padding:12px 17px;font-weight:700;cursor:pointer}.quick-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin:22px 0 34px}.quick-grid button{background:white;border:1px solid #e2e8f0;border-radius:16px;padding:16px 8px;display:flex;flex-direction:column;align-items:center;gap:9px;cursor:pointer;color:#1e293b;transition:.2s}.quick-grid button:hover{transform:translateY(-2px);box-shadow:0 10px 25px #0f172a12}.quick-grid b{font-size:25px}.quick-grid span{font-size:12px;font-weight:700}.section-head,.page-title{display:flex;align-items:center;justify-content:space-between;margin:18px 0}.section-head h2,.page-title h2{margin:3px 0;font-size:25px}.section-head button{background:none;border:0;color:#2563eb;font-weight:700;cursor:pointer}.place-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.place-card{background:white;border:1px solid #e2e8f0;border-radius:16px;padding:15px;display:flex;align-items:center;gap:12px;cursor:pointer;position:relative;transition:.2s}.place-card:hover{box-shadow:0 10px 25px #0f172a0e;transform:translateY(-1px)}.place-icon{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;background:#eff6ff;font-size:21px;flex:none}.place-icon.laboratory{background:#ecfeff}.place-icon.office{background:#f5f3ff}.place-icon.facility{background:#fffbeb}.place-info{min-width:0;flex:1}.place-info h3{font-size:14px;margin:0 0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.place-info p{font-size:12px;color:#64748b;margin:0}.place-info small{display:block;color:#64748b;margin-top:5px;line-height:1.4}.heart{border:0;background:transparent;font-size:21px;color:#94a3b8;cursor:pointer}.heart.on{color:#ef4444}.assistant-card{margin:28px 0;background:linear-gradient(120deg,#eef2ff,#ecfeff);border:1px solid #dbeafe;border-radius:18px;padding:16px;display:flex;align-items:center;gap:13px}.assistant-avatar{width:44px;height:44px;border-radius:13px;background:#4f46e5;color:#fff;display:grid;place-items:center;font-weight:900;font-size:12px}.assistant-card div:nth-child(2){flex:1}.assistant-card strong{font-size:14px}.assistant-card p{font-size:12px;color:#64748b;margin:4px 0}.assistant-card button{border:0;background:#fff;padding:9px 14px;border-radius:10px;font-weight:700;color:#4f46e5;cursor:pointer}.map-wrap{position:relative;background:white;border-radius:18px;overflow:hidden;border:1px solid #e2e8f0}.map-wrap #mapCanvas{height:68vh;min-height:450px}.map-search{position:absolute;top:12px;left:12px;right:12px;z-index:500;margin:0;max-width:560px}.route-panel{position:absolute;bottom:14px;left:14px;right:14px;z-index:500;background:#0f172a;color:white;border-radius:13px;padding:13px 15px;box-shadow:0 8px 25px #0004}.route-panel b,.route-panel span{display:block}.route-panel span{font-size:12px;color:#cbd5e1;margin-top:4px}.map-legend{display:flex;gap:18px;font-size:12px;color:#64748b;padding:12px 3px}.popup-btn{margin-top:6px;border:0;background:#2563eb;color:white;border-radius:7px;padding:6px 10px;cursor:pointer}.chips{display:flex;gap:7px;overflow:auto;padding:2px 0 15px}.chip{white-space:nowrap;border:1px solid #e2e8f0;background:#fff;border-radius:999px;padding:8px 13px;cursor:pointer;font-size:12px}.chip.active{background:#0f172a;color:#fff;border-color:#0f172a}.places-list{display:grid;gap:10px}.back-btn{border:0;background:transparent;color:#2563eb;font-weight:700;cursor:pointer;padding:8px 0}.detail-hero{background:#0f172a;color:white;border-radius:22px;padding:28px;margin-top:10px}.big-icon{font-size:45px}.tag{display:inline-block;margin-top:12px;padding:5px 9px;border-radius:999px;background:#1e293b;color:#93c5fd;font-size:11px;font-weight:800}.detail-hero h1{font-size:32px;margin:10px 0 5px}.detail-hero p{color:#cbd5e1;margin:0;line-height:1.5}.detail-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:13px 0}.detail-grid>div{background:#fff;border:1px solid #e2e8f0;border-radius:13px;padding:15px}.detail-grid small{display:block;color:#94a3b8;font-size:10px;font-weight:800;margin-bottom:6px}.detail-grid b{font-size:13px}.detail-actions{display:flex;gap:10px;margin:14px 0}.secondary-btn,.danger-btn{border:1px solid #dbe2ea;background:#fff;color:#334155;border-radius:10px;padding:11px 15px;font-weight:700;cursor:pointer}.danger-btn{color:#dc2626;border-color:#fecaca}.danger-text{color:#dc2626!important}.full{width:100%}.mini-map{height:260px;border-radius:16px;overflow:hidden;margin-top:14px}.empty{background:#fff;border:1px dashed #cbd5e1;border-radius:16px;padding:50px 20px;text-align:center;color:#64748b}.empty-icon{font-size:38px}.modal{position:fixed;inset:0;background:#02061799;z-index:3000;display:grid;place-items:center;padding:18px}.modal[hidden]{display:none}.modal-card{background:#fff;border-radius:20px;width:min(620px,100%);max-height:90vh;overflow:auto;padding:20px;box-shadow:0 30px 80px #0005}.modal-card.small{width:min(430px,100%)}.modal-head{display:flex;align-items:center;justify-content:space-between}.modal-head h3{margin:0}.modal-head button{border:0;background:#f1f5f9;border-radius:9px;width:34px;height:34px;font-size:21px;cursor:pointer}.muted{color:#64748b;font-size:13px;line-height:1.5}.full-input{width:100%;padding:13px;border:1px solid #cbd5e1;border-radius:10px;margin:8px 0 12px;outline:none}.chat{height:330px;overflow:auto;padding:12px 2px;display:flex;flex-direction:column;gap:9px}.bubble{max-width:82%;padding:10px 12px;border-radius:13px;font-size:13px;line-height:1.45}.bubble.bot{background:#eef2ff;align-self:flex-start}.bubble.user{background:#2563eb;color:#fff;align-self:flex-end}.chat-input{display:flex;gap:7px}.chat-input input{flex:1;padding:12px;border:1px solid #cbd5e1;border-radius:10px;outline:0}.chat-input button{border:0;background:#2563eb;color:#fff;border-radius:10px;padding:0 15px;font-weight:700}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:15px 0}.stats>div{background:white;border:1px solid #e2e8f0;border-radius:15px;padding:18px}.stats b,.stats span{display:block}.stats b{font-size:28px}.stats span{font-size:12px;color:#64748b;margin-top:4px}.admin-actions{display:flex;flex-wrap:wrap;gap:8px;margin:15px 0}.file-label{display:inline-block}.admin-list{background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden}.admin-row{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #eef2f7}.admin-row:last-child{border-bottom:0}.admin-row>div{flex:1}.admin-row b,.admin-row small{display:block}.admin-row small{color:#64748b;font-size:11px;margin-top:3px}.admin-row button{border:0;background:#eef2ff;color:#3730a3;border-radius:8px;padding:7px 10px;cursor:pointer}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:15px 0}.form-grid label{font-size:10px;font-weight:800;color:#64748b}.form-grid label:nth-child(3){grid-column:1/-1}.form-grid input{display:block;width:100%;margin-top:5px;padding:10px;border:1px solid #cbd5e1;border-radius:9px;outline:none;font-size:13px}.toast{position:fixed;left:50%;bottom:90px;transform:translate(-50%,20px);background:#0f172a;color:white;padding:11px 16px;border-radius:999px;font-size:12px;opacity:0;pointer-events:none;transition:.25s;z-index:5000}.toast.show{opacity:1;transform:translate(-50%,0)}.bottom-nav{position:fixed;bottom:0;left:0;right:0;height:70px;background:#fff;border-top:1px solid #e2e8f0;display:flex;justify-content:center;gap:min(12vw,90px);z-index:1200;padding-bottom:env(safe-area-inset-bottom)}.bottom-nav button{border:0;background:none;color:#94a3b8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:20px;cursor:pointer;min-width:50px}.bottom-nav button span{font-size:10px;font-weight:700}.bottom-nav button.active{color:#2563eb}.leaflet-control-attribution{font-size:9px}@media(max-width:760px){.quick-grid{grid-template-columns:repeat(3,1fr)}.place-grid{grid-template-columns:1fr}.hero{padding:25px 20px}.hero-icon{display:none}.detail-grid{grid-template-columns:1fr 1fr}.page{padding:20px 13px}.topbar{padding:0 13px}.brand strong{font-size:13px}.form-grid{grid-template-columns:1fr}.form-grid label:nth-child(3){grid-column:auto}.bottom-nav{gap:7vw}}@media(min-width:900px){.bottom-nav{display:none}body{padding-bottom:0}}
+
+
+.map-style-control{position:absolute;top:70px;left:12px;z-index:600;background:rgba(255,255,255,.96);padding:5px;border-radius:12px;box-shadow:0 5px 18px #0002;display:flex;gap:4px}
+.map-style-btn{border:0;background:transparent;color:#334155;border-radius:8px;padding:8px 10px;font-size:11px;font-weight:800;cursor:pointer}
+.map-style-btn.active{background:#0f172a;color:#fff}
+@media(max-width:520px){.map-style-control{top:70px;left:8px;right:8px;justify-content:space-between}.map-style-btn{flex:1;padding:8px 5px}}
+</style>
+  <title>Campus Navigator</title>
+  <script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+  <div id="toast" class="toast"></div>
+
+  <header class="topbar">
+    <div class="brand" onclick="app.show('home')">
+      <img class="brand-mark" src="media/college-logo.jpg" alt="RYMEC logo">
+      <div>
+        <strong id="brandName">Campus Navigator</strong>
+        <small>Smart Campus Guide</small>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn" title="Install app" id="installBtn" hidden>⇩</button>
+      <button class="icon-btn" title="My location" onclick="app.locate()">⌖</button>
+      <button class="icon-btn" title="Admin" onclick="app.openAdmin()">⚙</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="home" class="page active">
+      <div class="hero hero-aerial">
+        <video class="hero-aerial-video" autoplay muted loop playsinline preload="auto" poster="media/aerial-campus.jpg" aria-hidden="true">
+          <source src="media/campus-aerial.mp4" type="video/mp4">
+        </video>
+        <div class="hero-aerial-overlay"></div>
+        <div class="hero-content">
+          <span class="eyebrow">WELCOME TO RYMEC</span>
+          <h1>Explore your campus<br><span>before you arrive.</span></h1>
+          <p>Use the real aerial campus view to understand the layout, then search any classroom, laboratory, office or facility and navigate there.</p>
+          <button class="hero-map-btn" onclick="app.show('map')">🗺️ Explore Campus Map</button>
+        </div>
+        <div class="hero-flyover-badge">
+          <span class="pulse-dot"></span> LIVE CAMPUS FLYOVER
+        </div>
+      </div>
+
+      <div class="search-box large">
+        <span>⌕</span>
+        <input id="homeSearch" placeholder="Search CSE Lab, Library, HOD Office..." autocomplete="off">
+        <button onclick="app.search(document.getElementById('homeSearch').value)">Search</button>
+      </div>
+
+      <div class="quick-grid">
+        <button onclick="app.show('map')"><b>🗺️</b><span>Campus Map</span></button>
+        <button onclick="app.openCategories('Classroom')"><b>🏫</b><span>Classrooms</span></button>
+        <button onclick="app.openCategories('Laboratory')"><b>🧪</b><span>Laboratories</span></button>
+        <button onclick="app.openCategories('Office')"><b>👨‍💼</b><span>Offices</span></button>
+        <button onclick="app.openCategories('Facility')"><b>⭐</b><span>Facilities</span></button>
+        <button onclick="app.show('favorites')"><b>♥</b><span>Favorites</span></button>
+      </div>
+
+      <div class="section-head"><h2>Popular places</h2><button onclick="app.show('places')">View all</button></div>
+      <div id="popularList" class="place-grid"></div>
+
+      <div class="campus-media">
+        <div class="section-head"><h2>Campus Views</h2><span class="eyebrow">REAL CAMPUS FOOTAGE</span></div>
+        <div class="media-grid">
+          <article class="media-card video-badge" onclick="app.openCampusMedia('aerial')">
+            <img src="media/aerial-campus.jpg" alt="Aerial campus view" loading="eager">
+            <div class="media-card-body"><b>Aerial Campus View</b><span>Explore the campus layout from above.</span></div>
+          </article>
+          <article class="media-card video-badge" onclick="app.openCampusMedia('main')">
+            <img src="media/main-block-front.jpg" alt="Main Block view">
+            <div class="media-card-body"><b>Main Block View</b><span>See the actual Main Block approach and entrance.</span></div>
+          </article>
+          <article class="media-card" onclick="app.showDetails('main')">
+            <img src="media/main-block-close.jpg" alt="Main Block close view">
+            <div class="media-card-body"><b>Main Block Details</b><span>Photos, video and navigation in one place.</span></div>
+          </article>
+        </div>
+      </div>
+
+      <div class="assistant-card">
+        <div class="assistant-avatar">AI</div>
+        <div>
+          <strong>Campus Assistant</strong>
+          <p>Ask me things like “Where is the library?”</p>
+        </div>
+        <button onclick="app.openAssistant()">Ask</button>
+      </div>
+    </section>
+
+    <section id="map" class="page">
+      <div class="page-title"><div><span class="eyebrow">EXPLORE</span><h2>Campus Map</h2></div><button class="secondary-btn" onclick="app.locate()">⌖ Locate me</button></div>
+      <div class="map-wrap">
+        <div id="mapCanvas"></div>
+        <div class="map-search search-box"><span>⌕</span><input id="mapSearch" placeholder="Search a location..." autocomplete="off"><button onclick="app.search(document.getElementById('mapSearch').value)">Go</button></div>
+        <div class="map-style-control">
+          <button class="map-style-btn active" data-style="satellite" onclick="app.setMapStyle('satellite')">🛰️ Satellite</button>
+          <button class="map-style-btn" data-style="street" onclick="app.setMapStyle('street')">🗺️ Standard</button>
+          <button class="map-style-btn" data-style="hybrid" onclick="app.setMapStyle('hybrid')">🌍 Hybrid</button>
+        </div>
+        <div id="routePanel" class="route-panel" hidden></div>
+      </div>
+      <div class="map-legend">
+        <span>● Location</span><span>◆ Your position</span><span>━━ Route</span>
+      </div>
+    </section>
+
+    <section id="places" class="page">
+      <div class="page-title"><div><span class="eyebrow">DIRECTORY</span><h2>Campus Places</h2></div></div>
+      <div class="search-box"><span>⌕</span><input id="placesSearch" oninput="app.filterPlaces(this.value)" placeholder="Search places..."></div>
+      <div class="chips" id="categoryChips"></div>
+      <div id="placesList" class="places-list"></div>
+    </section>
+
+    <section id="details" class="page">
+      <button class="back-btn" onclick="app.show('places')">← Back</button>
+      <div id="detailsContent"></div>
+    </section>
+
+    <section id="favorites" class="page">
+      <div class="page-title"><div><span class="eyebrow">SAVED</span><h2>Favorites</h2></div></div>
+      <div id="favoritesList" class="places-list"></div>
+    </section>
+
+    <section id="admin" class="page">
+      <div class="page-title"><div><span class="eyebrow">MANAGE</span><h2>Admin Dashboard</h2></div><button class="secondary-btn" onclick="app.show('home')">Exit</button></div>
+      <div id="adminContent"></div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav">
+    <button data-page="home" onclick="app.show('home')">⌂<span>Home</span></button>
+    <button data-page="map" onclick="app.show('map')">⌖<span>Map</span></button>
+    <button data-page="places" onclick="app.show('places')">☷<span>Places</span></button>
+    <button data-page="favorites" onclick="app.show('favorites')">♥<span>Saved</span></button>
+  </nav>
+
+  <div id="assistantModal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head"><h3>Campus Assistant</h3><button onclick="app.closeAssistant()">×</button></div>
+      <div id="chat" class="chat"></div>
+      <div class="chat-input"><input id="chatInput" placeholder="Ask about a place..." onkeydown="if(event.key==='Enter')app.askAssistant()"><button onclick="app.askAssistant()">Send</button></div>
+    </div>
+  </div>
+
+  <div id="adminModal" class="modal" hidden>
+    <div class="modal-card small">
+      <div class="modal-head"><h3>Admin Access</h3><button onclick="app.closeAdmin()">×</button></div>
+      <p class="muted">Demo admin password: <b>admin123</b>. Change it before public deployment.</p>
+      <input id="adminPassword" class="full-input" type="password" placeholder="Admin password">
+      <button class="primary-btn full" onclick="app.loginAdmin()">Open Dashboard</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+// Campus configuration. Edit these values for your college.
+window.CAMPUS_CONFIG = {
+  name: "Rao Bahadur Y Mahabaleswarappa Engineering College",
+  shortName: "Campus Navigator",
+  tagline: "Smart Campus Guide",
+  center: [15.1394, 76.9214], // approximate Ballari area; replace with your exact campus coordinates
+  zoom: 17,
+  adminPassword: "admin123"
+};
+
+const DEFAULT_PLACES = [
+  {id:"main",name:"Main Block",category:"Building",description:"Main academic and administrative block.",building:"Main Block",floor:"Ground Floor",room:"",lat:15.13955,lng:76.92135},
+  {id:"cse101",name:"CSE Computer Laboratory",category:"Laboratory",description:"Computer Science and Engineering laboratory.",building:"CSE Block",floor:"1st Floor",room:"CSE-101",lat:15.13975,lng:76.92110},
+  {id:"cse302",name:"CSE Classroom 302",category:"Classroom",description:"CSE classroom for theory sessions.",building:"CSE Block",floor:"2nd Floor",room:"CSE-302",lat:15.13972,lng:76.92105},
+  {id:"library",name:"Central Library",category:"Facility",description:"Books, digital resources and study spaces.",building:"Library Block",floor:"Ground Floor",room:"",lat:15.13915,lng:76.92165},
+  {id:"canteen",name:"College Canteen",category:"Facility",description:"Food and refreshments for students and staff.",building:"Canteen",floor:"Ground Floor",room:"",lat:15.13905,lng:76.92115},
+  {id:"hod",name:"CSE HOD Office",category:"Office",description:"Department office of Computer Science and Engineering.",building:"CSE Block",floor:"2nd Floor",room:"CSE-201",lat:15.13968,lng:76.92108},
+  {id:"principal",name:"Principal Office",category:"Office",description:"Principal and administration office.",building:"Main Block",floor:"1st Floor",room:"A-105",lat:15.13960,lng:76.92142},
+  {id:"parking",name:"Student Parking",category:"Facility",description:"Parking area for students.",building:"Parking Area",floor:"Ground",room:"",lat:15.13885,lng:76.92095},
+  {id:"washroom",name:"Main Block Washroom",category:"Facility",description:"Student washroom facility.",building:"Main Block",floor:"Ground Floor",room:"",lat:15.13948,lng:76.92152}
+];
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+
+const app = {
+  places: [],
+  map: null,
+  markers: {},
+  userMarker: null,
+  routeLine: null,
+  deferredInstall: null,
+  currentLocation: null,
+
+  init() {
+    this.places = JSON.parse(localStorage.getItem("campus_places") || "null") || DEFAULT_PLACES;
+    document.title = CAMPUS_CONFIG.name + " | Campus Navigator";
+    $("#brandName").textContent = CAMPUS_CONFIG.shortName;
+    this.renderPopular();
+    this.renderPlaces();
+    this.renderCategories();
+    this.renderFavorites();
+    this.initMap();
+    this.registerPWA();
+    window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); this.deferredInstall = e; $("#installBtn").hidden = false; });
+    $("#installBtn").onclick = () => this.install();
+    this.show("home");
+  },
+
+  save() { localStorage.setItem("campus_places", JSON.stringify(this.places)); },
+
+  show(id) {
+    $$(".page").forEach(p => p.classList.remove("active"));
+    $("#" + id).classList.add("active");
+    $$(".bottom-nav button").forEach(b => b.classList.toggle("active", b.dataset.page === id));
+    if (id === "map" && this.map) setTimeout(() => this.map.invalidateSize(), 150);
+    if (id === "favorites") this.renderFavorites();
+    if (id === "places") this.renderPlaces();
+    window.scrollTo({top:0,behavior:"smooth"});
+  },
+
+  initMap() {
+    this.map = L.map("mapCanvas", {zoomControl:false}).setView(CAMPUS_CONFIG.center, CAMPUS_CONFIG.zoom);
+    L.control.zoom({position:"bottomright"}).addTo(this.map);
+    this.baseLayers = {
+      street: L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom:20, attribution:'&copy; OpenStreetMap contributors'
+      }),
+      satellite: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+        maxZoom:19, attribution:'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+      })
+    };
+    this.baseLayers.satellite.addTo(this.map);
+    this.hybridOverlay = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom:19, opacity:0.38, attribution:'&copy; OpenStreetMap contributors'
+    });
+    this.mapStyle = "satellite";
+    this.renderMarkers();
+  },
+
+  setMapStyle(style) {
+    if (!this.map || !this.baseLayers) return;
+    ["street","satellite"].forEach(k => {
+      if (this.map.hasLayer(this.baseLayers[k])) this.map.removeLayer(this.baseLayers[k]);
+    });
+    if (this.map.hasLayer(this.hybridOverlay)) this.map.removeLayer(this.hybridOverlay);
+    if (style === "street") {
+      this.baseLayers.street.addTo(this.map);
+    } else if (style === "hybrid") {
+      this.baseLayers.satellite.addTo(this.map);
+      this.hybridOverlay.addTo(this.map);
+    } else {
+      this.baseLayers.satellite.addTo(this.map);
+    }
+    this.mapStyle = style;
+    document.querySelectorAll(".map-style-btn").forEach(b => b.classList.toggle("active", b.dataset.style === style));
+    setTimeout(() => this.map.invalidateSize(), 100);
+  },
+
+  renderMarkers() {
+    Object.values(this.markers).forEach(m => m.remove());
+    this.markers = {};
+    this.places.forEach(p => {
+      const m = L.marker([p.lat,p.lng]).addTo(this.map);
+      m.bindPopup(`<b>${this.escape(p.name)}</b><br><small>${this.escape(p.category)} · ${this.escape(p.building)}</small><br><button class="popup-btn" onclick="app.showDetails('${p.id}')">View details</button>`);
+      this.markers[p.id] = m;
+    });
+  },
+
+  renderPopular() {
+    $("#popularList").innerHTML = this.places.slice(0,6).map(p => this.placeCard(p)).join("");
+  },
+
+  renderPlaces(filter="", category="All") {
+    const q = filter.toLowerCase();
+    const list = this.places.filter(p => (category==="All" || p.category===category) &&
+      [p.name,p.category,p.building,p.room,p.description].join(" ").toLowerCase().includes(q));
+    $("#placesList").innerHTML = list.length ? list.map(p=>this.placeCard(p,true)).join("") : `<div class="empty">No matching places found.</div>`;
+  },
+
+  filterPlaces(v) { this.renderPlaces(v); },
+
+  openCategories(cat) {
+    this.show("places");
+    $("#placesSearch").value = "";
+    this.renderPlaces("",cat);
+    $$(".chip").forEach(c => c.classList.toggle("active", c.textContent===cat));
+  },
+
+  renderCategories() {
+    const cats = ["All",...new Set(this.places.map(p=>p.category))];
+    $("#categoryChips").innerHTML = cats.map(c=>`<button class="chip ${c==="All"?"active":""}" onclick="app.category('${this.escapeAttr(c)}')">${this.escape(c)}</button>`).join("");
+  },
+
+  category(cat) {
+    $$(".chip").forEach(c=>c.classList.toggle("active",c.textContent===cat));
+    this.renderPlaces($("#placesSearch").value,cat);
+  },
+
+  placeCard(p, detailed=false) {
+    const fav = this.isFavorite(p.id);
+    return `<article class="place-card" onclick="app.showDetails('${p.id}')">
+      <div class="place-icon ${p.category.toLowerCase()}">${this.icon(p.category)}</div>
+      <div class="place-info"><h3>${this.escape(p.name)}</h3><p>${this.escape(p.building)}${p.room ? " · "+this.escape(p.room):""}</p>${detailed?`<small>${this.escape(p.description)}</small>`:""}</div>
+      <button class="heart ${fav?"on":""}" onclick="event.stopPropagation();app.toggleFavorite('${p.id}')">${fav?"♥":"♡"}</button>
+    </article>`;
+  },
+
+  showDetails(id) {
+    const p = this.places.find(x=>x.id===id); if(!p) return;
+    $("#detailsContent").innerHTML = `
+      <div class="detail-hero"><div class="big-icon">${this.icon(p.category)}</div><span class="tag">${this.escape(p.category)}</span><h1>${this.escape(p.name)}</h1><p>${this.escape(p.description)}</p></div>
+      <div class="detail-grid">
+        <div><small>BUILDING</small><b>${this.escape(p.building)}</b></div>
+        <div><small>FLOOR</small><b>${this.escape(p.floor)}</b></div>
+        <div><small>ROOM</small><b>${this.escape(p.room || "—")}</b></div>
+        <div><small>COORDINATES</small><b>${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</b></div>
+      </div>
+      <div class="detail-actions"><button class="primary-btn" onclick="app.navigateTo('${p.id}')">🧭 Navigate</button><button class="secondary-btn" onclick="app.toggleFavorite('${p.id}');app.showDetails('${p.id}')">${this.isFavorite(p.id)?"♥ Saved":"♡ Save"}</button></div>
+      ${p.id==='main'?`<div class="media-gallery"><h3>Actual Main Block Views</h3><div class="gallery-grid">
+        <figure><img src="media/main-block-front.jpg" alt="Main Block front view"><figcaption>Front approach captured from the uploaded campus video.</figcaption></figure>
+        <figure><img src="media/main-block-close.jpg" alt="Main Block close view"><figcaption>Closer view of the Main Block entrance.</figcaption></figure>
+        <figure class="video-badge"><video controls playsinline preload="metadata" poster="media/main-block-front.jpg"><source src="media/main-block.mp4" type="video/mp4"></video><figcaption>Main Block aerial-to-front video.</figcaption></figure>
+        <figure class="video-badge"><video controls playsinline preload="metadata" poster="media/aerial-campus.jpg"><source src="media/campus-aerial.mp4" type="video/mp4"></video><figcaption>Campus aerial video used to understand the campus layout.</figcaption></figure>
+      </div></div>`:''}
+      <div class="mini-map" id="detailMap"></div>`;
+    this.show("details");
+    setTimeout(()=>{
+      const m=L.map("detailMap",{zoomControl:false,attributionControl:false}).setView([p.lat,p.lng],18);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(m);
+      L.marker([p.lat,p.lng]).addTo(m).bindPopup(this.escape(p.name)).openPopup();
+    },50);
+  },
+
+  openCampusMedia(type) {
+    const isMain = type === 'main';
+    const title = isMain ? 'Main Block — Real Campus View' : 'Campus — Aerial View';
+    const poster = isMain ? 'media/main-block-front.jpg' : 'media/aerial-campus.jpg';
+    const video = isMain ? 'media/main-block.mp4' : 'media/campus-aerial.mp4';
+    const modal = document.createElement('div');
+    modal.className='modal';
+    modal.innerHTML=`<div class="modal-card"><div class="modal-head"><h3>${title}</h3><button onclick="this.closest('.modal').remove()">×</button></div><video controls autoplay playsinline style="width:100%;border-radius:14px;margin-top:14px;background:#000" poster="${poster}"><source src="${video}" type="video/mp4"></video><p class="muted">This view was created from the campus footage you provided. It is used as a place-specific visual reference, not a full Street View.</p></div>`;
+    document.body.appendChild(modal);
+  },
+
+  search(q) {
+    q=(q||"").trim();
+    if(!q){this.show("places");return;}
+    const found=this.places.find(p=>[p.name,p.category,p.building,p.room].join(" ").toLowerCase().includes(q.toLowerCase()));
+    this.show("places"); $("#placesSearch").value=q;
+    this.renderPlaces(q);
+    if(found){ this.map.setView([found.lat,found.lng],18); this.markers[found.id]?.openPopup(); }
+  },
+
+  navigateTo(id) {
+    const p=this.places.find(x=>x.id===id); if(!p)return;
+    this.show("map");
+    this.map.setView([p.lat,p.lng],18);
+    this.markers[p.id]?.openPopup();
+    if(!this.currentLocation){ this.toast("Allow location access to calculate a route."); this.locate(()=>this.buildRoute(p)); }
+    else this.buildRoute(p);
+  },
+
+  locate(callback) {
+    if(!navigator.geolocation){this.toast("Geolocation is not supported on this device.");return;}
+    this.toast("Requesting your location...");
+    navigator.geolocation.getCurrentPosition(pos=>{
+      this.currentLocation=[pos.coords.latitude,pos.coords.longitude];
+      if(this.userMarker)this.userMarker.remove();
+      this.userMarker=L.marker(this.currentLocation,{title:"You are here"}).addTo(this.map).bindPopup("<b>You are here</b>");
+      this.map.setView(this.currentLocation,18);
+      this.toast("Location found.");
+      if(callback)callback();
+    },()=>this.toast("Location permission was denied or unavailable."),{enableHighAccuracy:true,timeout:10000});
+  },
+
+  async buildRoute(p) {
+    const [lat,lng]=this.currentLocation;
+    $("#routePanel").hidden=false; $("#routePanel").innerHTML="Calculating route...";
+    try{
+      const url=`https://router.project-osrm.org/route/v1/driving/${lng},${lat};${p.lng},${p.lat}?overview=full&geometries=geojson`;
+      const r=await fetch(url); const data=await r.json();
+      if(!data.routes?.length)throw new Error();
+      const route=data.routes[0];
+      if(this.routeLine)this.routeLine.remove();
+      this.routeLine=L.geoJSON(route.geometry,{weight:6}).addTo(this.map);
+      this.map.fitBounds(this.routeLine.getBounds(),{padding:[30,30]});
+      $("#routePanel").innerHTML=`<b>Route to ${this.escape(p.name)}</b><span>${(route.distance/1000).toFixed(2)} km · approx ${Math.ceil(route.duration/60)} min</span>`;
+    }catch(e){
+      $("#routePanel").innerHTML=`<b>Navigation</b><span>Online routing is temporarily unavailable. Destination: ${this.escape(p.name)} (${p.lat.toFixed(5)}, ${p.lng.toFixed(5)})</span>`;
+    }
+  },
+
+  isFavorite(id){return JSON.parse(localStorage.getItem("campus_favorites")||"[]").includes(id);},
+  toggleFavorite(id){
+    let f=JSON.parse(localStorage.getItem("campus_favorites")||"[]");
+    f=f.includes(id)?f.filter(x=>x!==id):[...f,id];
+    localStorage.setItem("campus_favorites",JSON.stringify(f));
+    this.renderPopular();this.renderPlaces();this.renderFavorites();
+    this.toast(f.includes(id)?"Added to favorites":"Removed from favorites");
+  },
+  renderFavorites(){
+    const f=JSON.parse(localStorage.getItem("campus_favorites")||"[]");
+    const list=this.places.filter(p=>f.includes(p.id));
+    $("#favoritesList").innerHTML=list.length?list.map(p=>this.placeCard(p,true)).join(""):`<div class="empty"><div class="empty-icon">♡</div><h3>No saved places</h3><p>Tap the heart on any location to save it.</p></div>`;
+  },
+
+  openAssistant(){
+    $("#assistantModal").hidden=false;
+    if(!$("#chat").children.length)this.addChat("bot","Hi! I can help you find places on campus. Try “Where is the library?”");
+  },
+  closeAssistant(){$("#assistantModal").hidden=true;},
+  addChat(who,msg){$("#chat").insertAdjacentHTML("beforeend",`<div class="bubble ${who}">${this.escape(msg)}</div>`);$("#chat").scrollTop=$("#chat").scrollHeight;},
+  askAssistant(){
+    const input=$("#chatInput"), q=input.value.trim(); if(!q)return; input.value="";
+    this.addChat("user",q);
+    const found=this.places.find(p=>[p.name,p.category,p.building,p.room].join(" ").toLowerCase().includes(q.toLowerCase()));
+    let reply;
+    if(found) reply=`${found.name} is in ${found.building}, ${found.floor}${found.room?" ("+found.room+")":""}. Tap the location card for navigation.`;
+    else if(q.toLowerCase().includes("near")||q.toLowerCase().includes("facility")) reply="I can search the campus directory for classrooms, labs, offices and facilities. Try a specific name.";
+    else reply="I couldn't find that place in the campus directory. Try the building, room number, or facility name.";
+    setTimeout(()=>this.addChat("bot",reply),250);
+  },
+
+  openAdmin(){$("#adminPassword").value="";$("#adminModal").hidden=false;},
+  closeAdmin(){$("#adminModal").hidden=true;},
+  loginAdmin(){
+    if($("#adminPassword").value!==CAMPUS_CONFIG.adminPassword){this.toast("Incorrect admin password.");return;}
+    this.closeAdmin();this.renderAdmin();this.show("admin");
+  },
+  renderAdmin(){
+    $("#adminContent").innerHTML=`
+      <div class="stats"><div><b>${this.places.length}</b><span>Locations</span></div><div><b>${new Set(this.places.map(p=>p.category)).size}</b><span>Categories</span></div><div><b>${JSON.parse(localStorage.getItem("campus_favorites")||"[]").length}</b><span>Saved</span></div></div>
+      <div class="admin-actions"><button class="primary-btn" onclick="app.newPlace()">＋ Add location</button><button class="secondary-btn" onclick="app.exportData()">Export JSON</button><label class="secondary-btn file-label">Import JSON<input type="file" accept=".json" onchange="app.importData(event)" hidden></label><button class="danger-btn" onclick="app.resetData()">Reset demo data</button></div>
+      <div class="admin-list">${this.places.map(p=>`<div class="admin-row"><div><b>${this.escape(p.name)}</b><small>${this.escape(p.category)} · ${this.escape(p.building)}</small></div><button onclick="app.editPlace('${p.id}')">Edit</button><button class="danger-text" onclick="app.deletePlace('${p.id}')">Delete</button></div>`).join("")}</div>`;
+  },
+  newPlace(){this.editPlace(null);},
+  editPlace(id){
+    const p=id?this.places.find(x=>x.id===id):{id:"p"+Date.now(),name:"",category:"Classroom",description:"",building:"",floor:"",room:"",lat:CAMPUS_CONFIG.center[0],lng:CAMPUS_CONFIG.center[1]};
+    const modal=document.createElement("div");modal.className="modal";modal.innerHTML=`<div class="modal-card"><div class="modal-head"><h3>${id?"Edit":"Add"} location</h3><button onclick="this.closest('.modal').remove()">×</button></div>
+    <div class="form-grid">${["name","category","description","building","floor","room","lat","lng"].map(k=>`<label>${k.toUpperCase()}<input id="f_${k}" value="${this.escapeAttr(p[k]??"")}"></label>`).join("")}</div>
+    <button class="primary-btn full" onclick="app.savePlace('${p.id}',this.closest('.modal'))">Save location</button></div>`;
+    document.body.appendChild(modal);
+  },
+  savePlace(id,modal){
+    const p={id};["name","category","description","building","floor","room"].forEach(k=>p[k]=$("#f_"+k).value.trim());
+    p.lat=parseFloat($("#f_lat").value);p.lng=parseFloat($("#f_lng").value);
+    if(!p.name||!Number.isFinite(p.lat)||!Number.isFinite(p.lng)){this.toast("Name and valid coordinates are required.");return;}
+    const i=this.places.findIndex(x=>x.id===id); if(i>=0)this.places[i]=p;else this.places.push(p);
+    this.save();modal.remove();this.renderAdmin();this.renderMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();this.toast("Location saved.");
+  },
+  deletePlace(id){if(confirm("Delete this location?")){this.places=this.places.filter(p=>p.id!==id);this.save();this.renderAdmin();this.renderMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();}},
+  resetData(){if(confirm("Reset all locations to demo data?")){this.places=DEFAULT_PLACES;this.save();location.reload();}},
+  exportData(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(this.places,null,2)],{type:"application/json"}));a.download="campus-locations.json";a.click();},
+  importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d))throw 0;this.places=d;this.save();this.renderAdmin();this.renderMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();this.toast("Locations imported.");}catch{this.toast("Invalid JSON file.");}};r.readAsText(f);},
+  install(){if(this.deferredInstall){this.deferredInstall.prompt();this.deferredInstall=null;}},
+  registerPWA(){if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});},
+  icon(cat){return ({Laboratory:"🧪",Classroom:"🏫",Office:"👨‍💼",Facility:"⭐",Building:"🏢"})[cat]||"📍";},
+  escape(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));},
+  escapeAttr(s){return this.escape(s).replace(/`/g,"&#96;");},
+  toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(this.tt);this.tt=setTimeout(()=>t.classList.remove("show"),2800);}
+};
+
+document.addEventListener("DOMContentLoaded",()=>app.init());
+
+</script>
+</body>
+</html>

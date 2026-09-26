@@ -1,0 +1,27 @@
+{
+  "name": "rymec-campus-navigator",
+  "version": "1.0.0",
+  "description": "Smart Campus Navigator - find classrooms, labs, offices and facilities for RYMEC",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve .",
+    "test": "echo \"No tests configured for static HTML site\" && exit 0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sagar-1972/rymec_campus_navigator.git"
+  },
+  "keywords": [
+    "campus",
+    "navigator",
+    "map",
+    "education",
+    "college",
+    "rymec"
+  ],
+  "author": "Sagar-1972",
+  "license": "MIT",
+  "dependencies": {
+    "@vercel/speed-insights": "^2.0.0"
+  }
+}
