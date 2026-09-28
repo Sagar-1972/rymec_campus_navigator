@@ -4,7 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0f172a">
-  <meta name="description" content="Smart Campus Navigator - find classrooms, labs, offices and facilities.">
+  <meta name="description" content="RYMEC Campus Navigator helps students and visitors find classrooms, laboratories, offices, parking areas, library and other campus facilities.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="author" content="RYMEC Campus Navigator">
+  <link rel="canonical" href="https://rymec-campus-navigator.vercel.app/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="RYMEC Campus Navigator | Campus Map & Navigation">
+  <meta property="og:description" content="Explore RYMEC campus, find classrooms, labs, offices and facilities, and navigate to them.">
+  <meta property="og:url" content="https://rymec-campus-navigator.vercel.app/">
+  <meta property="og:image" content="https://rymec-campus-navigator.vercel.app/media/social-preview.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="RYMEC Campus Navigator">
+  <meta name="twitter:description" content="Interactive campus map and location guide for RYMEC.">
+  <meta name="twitter:image" content="https://rymec-campus-navigator.vercel.app/media/social-preview.jpg">
+  <link rel="icon" href="media/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="media/favicon.png">
   
   
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -29,11 +43,44 @@
 .map-style-btn{border:0;background:transparent;color:#334155;border-radius:8px;padding:8px 10px;font-size:11px;font-weight:800;cursor:pointer}
 .map-style-btn.active{background:#0f172a;color:#fff}
 @media(max-width:520px){.map-style-control{top:70px;left:8px;right:8px;justify-content:space-between}.map-style-btn{flex:1;padding:8px 5px}}
+
+/* Production upgrade */
+.skip-link{position:fixed;left:12px;top:-60px;background:#0f172a;color:#fff;padding:10px 14px;border-radius:9px;z-index:6000;font-weight:800}
+.skip-link:focus{top:12px}
+.map-3d-wrap{position:relative;background:#0b1220;border-radius:18px;overflow:hidden;min-height:560px;box-shadow:0 12px 30px #0f172a22}
+.map-3d-image{width:100%;height:560px;object-fit:cover;display:block}
+.map-3d-overlay{position:absolute;inset:0;pointer-events:none}
+.map3d-marker{position:absolute;transform:translate(-50%,-100%);pointer-events:auto;border:0;background:#2563eb;color:#fff;border-radius:999px;padding:7px 10px;font-size:11px;font-weight:800;box-shadow:0 5px 16px #0005;cursor:pointer;white-space:nowrap}
+.map3d-marker:before{content:"";position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);border:5px solid transparent;border-top-color:#2563eb;border-bottom:0}
+.map3d-marker:hover{transform:translate(-50%,-105%) scale(1.03)}
+.map3d-note{position:absolute;left:12px;bottom:12px;background:#0f172acc;color:#fff;border-radius:12px;padding:9px 11px;font-size:11px;max-width:min(360px,calc(100% - 24px));backdrop-filter:blur(6px)}
+.map-style-btn[data-style="3d"]{background:#fff7ed;color:#9a3412}
+.map-style-btn[data-style="3d"].active{background:#ea580c;color:#fff}
+.footer{max-width:1180px;margin:30px auto 0;padding:22px 18px;color:#64748b;font-size:12px;text-align:center}
+.footer a{color:#2563eb;text-decoration:none;margin:0 7px}
+.footer a:hover{text-decoration:underline}
+.legal-copy{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:22px;line-height:1.7}
+.legal-copy h3{margin-top:22px}.legal-copy h3:first-child{margin-top:0}
+.cookie-banner{position:fixed;left:16px;right:16px;bottom:82px;z-index:4500;background:#0f172a;color:#fff;border-radius:16px;padding:14px 16px;box-shadow:0 15px 45px #0006;display:flex;gap:14px;align-items:center;justify-content:space-between}
+.cookie-banner p{margin:0;font-size:12px;line-height:1.5;color:#cbd5e1}.cookie-actions{display:flex;gap:8px;flex:none}.cookie-actions button{border:0;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer}.cookie-accept{background:#38bdf8;color:#082f49}.cookie-reject{background:#334155;color:#fff}
+.security-note{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:13px;padding:12px;margin:12px 0;font-size:12px;line-height:1.5}
+.cta-row{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+@media(max-width:760px){.map-3d-wrap,.map-3d-image{min-height:430px;height:430px}.map3d-marker{font-size:9px;padding:6px 8px}.cookie-banner{bottom:76px;flex-direction:column;align-items:stretch}.cookie-actions{justify-content:flex-end}}
+
 </style>
-  <title>Campus Navigator</title>
-  <script defer src="/_vercel/insights/script.js"></script>
+  <title>RYMEC Campus Navigator | Campus Map & Navigation</title>
+  <script type="application/ld+json">
+  {
+    "@context":"https://schema.org",
+    "@type":"WebSite",
+    "name":"RYMEC Campus Navigator",
+    "url":"https://rymec-campus-navigator.vercel.app/",
+    "description":"Interactive campus map and navigation guide for Rao Bahadur Y Mahabaleswarappa Engineering College."
+  }
+  </script>
 </head>
 <body>
+  <a class="skip-link" href="#mainContent">Skip to main content</a>
   <div id="toast" class="toast"></div>
 
   <header class="topbar">
@@ -51,7 +98,7 @@
     </div>
   </header>
 
-  <main>
+  <main id="mainContent">
     <section id="home" class="page active">
       <div class="hero hero-aerial">
         <video class="hero-aerial-video" autoplay muted loop playsinline preload="auto" poster="media/aerial-campus.jpg" aria-hidden="true">
@@ -61,7 +108,7 @@
         <div class="hero-content">
           <span class="eyebrow">WELCOME TO RYMEC</span>
           <h1>Explore your campus<br><span>before you arrive.</span></h1>
-          <p>Use the real aerial campus view to understand the layout, then search any classroom, laboratory, office or facility and navigate there.</p>
+          <p>Explore Rao Bahadur Y Mahabaleswarappa Engineering College, find classrooms, laboratories, offices, parking areas and facilities, and navigate to them.</p>
           <button class="hero-map-btn" onclick="app.show('map')">🗺️ Explore Campus Map</button>
         </div>
         <div class="hero-flyover-badge">
@@ -91,15 +138,15 @@
         <div class="section-head"><h2>Campus Views</h2><span class="eyebrow">REAL CAMPUS FOOTAGE</span></div>
         <div class="media-grid">
           <article class="media-card video-badge" onclick="app.openCampusMedia('aerial')">
-            <img src="media/aerial-campus.jpg" alt="Aerial campus view" loading="eager">
+            <img src="media/aerial-campus.jpg" alt="Aerial campus view" loading="eager" decoding="async">
             <div class="media-card-body"><b>Aerial Campus View</b><span>Explore the campus layout from above.</span></div>
           </article>
           <article class="media-card video-badge" onclick="app.openCampusMedia('main')">
-            <img src="media/main-block-front.jpg" alt="Main Block view">
+            <img src="media/main-block-front.jpg" alt="RYMEC Main Block front view" loading="lazy" decoding="async">
             <div class="media-card-body"><b>Main Block View</b><span>See the actual Main Block approach and entrance.</span></div>
           </article>
           <article class="media-card" onclick="app.showDetails('main')">
-            <img src="media/main-block-close.jpg" alt="Main Block close view">
+            <img src="media/main-block-close.jpg" alt="RYMEC Main Block entrance close view" loading="lazy" decoding="async">
             <div class="media-card-body"><b>Main Block Details</b><span>Photos, video and navigation in one place.</span></div>
           </article>
         </div>
@@ -119,11 +166,17 @@
       <div class="page-title"><div><span class="eyebrow">EXPLORE</span><h2>Campus Map</h2></div><button class="secondary-btn" onclick="app.locate()">⌖ Locate me</button></div>
       <div class="map-wrap">
         <div id="mapCanvas"></div>
+        <div id="map3dCanvas" class="map-3d-wrap" hidden>
+          <img class="map-3d-image" src="media/campus-3d-map.png" alt="Illustrative 3D aerial map of the RYMEC campus layout" loading="lazy" decoding="async">
+          <div id="map3dMarkers" class="map-3d-overlay"></div>
+          <div class="map3d-note">🏫 3D campus view for visual orientation. Use Satellite/Standard for GPS-based navigation.</div>
+        </div>
         <div class="map-search search-box"><span>⌕</span><input id="mapSearch" placeholder="Search a location..." autocomplete="off"><button onclick="app.search(document.getElementById('mapSearch').value)">Go</button></div>
         <div class="map-style-control">
           <button class="map-style-btn active" data-style="satellite" onclick="app.setMapStyle('satellite')">🛰️ Satellite</button>
           <button class="map-style-btn" data-style="street" onclick="app.setMapStyle('street')">🗺️ Standard</button>
           <button class="map-style-btn" data-style="hybrid" onclick="app.setMapStyle('hybrid')">🌍 Hybrid</button>
+          <button class="map-style-btn" data-style="3d" onclick="app.setMapStyle('3d')">🏫 3D Campus</button>
         </div>
         <div id="routePanel" class="route-panel" hidden></div>
       </div>
@@ -153,7 +206,43 @@
       <div class="page-title"><div><span class="eyebrow">MANAGE</span><h2>Admin Dashboard</h2></div><button class="secondary-btn" onclick="app.show('home')">Exit</button></div>
       <div id="adminContent"></div>
     </section>
+  
+    <section id="privacy" class="page">
+      <div class="page-title"><div><span class="eyebrow">LEGAL</span><h2>Privacy Policy</h2></div></div>
+      <div class="legal-copy">
+        <h3>What this app does</h3>
+        <p>RYMEC Campus Navigator helps students and visitors find campus locations and request navigation routes.</p>
+        <h3>Location information</h3>
+        <p>If you choose “Locate me”, your browser may provide your device location to this page so a route can be calculated. Location access is controlled by your browser and is not required to browse the campus directory.</p>
+        <h3>Saved preferences</h3>
+        <p>Favorites and locally edited demo locations may be stored in your browser's local storage. They are not automatically shared with the college server.</p>
+        <h3>Analytics</h3>
+        <p>If you accept the analytics notice, the site enables Vercel Web Analytics to measure website usage. You can clear the site's local storage to remove the local consent preference.</p>
+        <h3>External services</h3>
+        <p>Maps and routing may use third-party services such as OpenStreetMap, Esri and OSRM. Their own terms and privacy practices apply when those services are requested.</p>
+        <h3>Contact</h3>
+        <p>For corrections or campus-location updates, contact the project administrator/college through the official channels.</p>
+      </div>
+    </section>
+    <section id="terms" class="page">
+      <div class="page-title"><div><span class="eyebrow">LEGAL</span><h2>Terms & Conditions</h2></div></div>
+      <div class="legal-copy">
+        <h3>Use of the navigator</h3>
+        <p>This application is provided as a campus information and navigation aid. Users should follow campus signage, staff instructions and safety rules.</p>
+        <h3>Location accuracy</h3>
+        <p>Map markers, building positions and routes may be approximate. Confirm the destination on site when necessary.</p>
+        <h3>Third-party maps</h3>
+        <p>Map tiles and routing are supplied by external services and may change availability, coverage or terms.</p>
+        <h3>Content corrections</h3>
+        <p>Campus administrators may update location information. Users should report incorrect or outdated information through the appropriate college channel.</p>
+        <h3>Availability</h3>
+        <p>The service may be unavailable during maintenance or because of network, map-provider or hosting issues.</p>
+      </div>
+    </section>
+
   </main>
+
+  <footer class="footer"><span>© RYMEC Campus Navigator</span> · <a href="#privacy" onclick="app.show('privacy')">Privacy</a> · <a href="#terms" onclick="app.show('terms')">Terms</a> · <a href="#home" onclick="app.show('home')">Home</a></footer>
 
   <nav class="bottom-nav">
     <button data-page="home" onclick="app.show('home')">⌂<span>Home</span></button>
@@ -170,10 +259,15 @@
     </div>
   </div>
 
+  <div id="cookieBanner" class="cookie-banner" hidden>
+    <p>We use privacy-focused analytics to understand how the Campus Navigator is used. No marketing cookies are used by this app.</p>
+    <div class="cookie-actions"><button class="cookie-reject" onclick="app.setAnalyticsConsent(false)">Not now</button><button class="cookie-accept" onclick="app.setAnalyticsConsent(true)">Allow analytics</button></div>
+  </div>
+
   <div id="adminModal" class="modal" hidden>
     <div class="modal-card small">
       <div class="modal-head"><h3>Admin Access</h3><button onclick="app.closeAdmin()">×</button></div>
-      <p class="muted">Demo admin password: <b>admin123</b>. Change it before public deployment.</p>
+      <div class="security-note"><b>Secure admin login.</b> The password is checked server-side using the Vercel <code>ADMIN_PASSWORD</code> environment variable. It is not stored in this HTML file.</div>
       <input id="adminPassword" class="full-input" type="password" placeholder="Admin password">
       <button class="primary-btn full" onclick="app.loginAdmin()">Open Dashboard</button>
     </div>
@@ -187,8 +281,7 @@ window.CAMPUS_CONFIG = {
   shortName: "Campus Navigator",
   tagline: "Smart Campus Guide",
   center: [15.1394, 76.9214], // approximate Ballari area; replace with your exact campus coordinates
-  zoom: 17,
-  adminPassword: "admin123"
+  zoom: 17
 };
 
 const DEFAULT_PLACES = [
@@ -225,6 +318,7 @@ const app = {
     this.renderFavorites();
     this.initMap();
     this.registerPWA();
+    this.initAnalyticsConsent();
     window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); this.deferredInstall = e; $("#installBtn").hidden = false; });
     $("#installBtn").onclick = () => this.install();
     this.show("home");
@@ -259,25 +353,48 @@ const app = {
     });
     this.mapStyle = "satellite";
     this.renderMarkers();
+    this.render3DMarkers();
+  },
+
+  render3DMarkers() {
+    const host = $("#map3dMarkers");
+    if (!host) return;
+    const positions = {
+      main:[52,35], cse101:[20,35], cse302:[20,35], library:[77,35],
+      canteen:[91,47], hod:[20,31], principal:[57,35], parking:[78,78],
+      washroom:[55,39], park:[50,60], cse:[20,35]
+    };
+    host.innerHTML = this.places.map(p => {
+      const pos = positions[p.id] || [50,50];
+      return `<button class="map3d-marker" style="left:${pos[0]}%;top:${pos[1]}%" onclick="app.showDetails('${p.id}')" aria-label="Open ${this.escapeAttr(p.name)}">${this.escape(p.name)}</button>`;
+    }).join("");
   },
 
   setMapStyle(style) {
-    if (!this.map || !this.baseLayers) return;
-    ["street","satellite"].forEach(k => {
-      if (this.map.hasLayer(this.baseLayers[k])) this.map.removeLayer(this.baseLayers[k]);
-    });
-    if (this.map.hasLayer(this.hybridOverlay)) this.map.removeLayer(this.hybridOverlay);
-    if (style === "street") {
-      this.baseLayers.street.addTo(this.map);
-    } else if (style === "hybrid") {
-      this.baseLayers.satellite.addTo(this.map);
-      this.hybridOverlay.addTo(this.map);
+    const map3d = $("#map3dCanvas"), map2d = $("#mapCanvas");
+    if (style === "3d") {
+      if (map2d) map2d.style.display = "none";
+      if (map3d) map3d.hidden = false;
     } else {
-      this.baseLayers.satellite.addTo(this.map);
+      if (map3d) map3d.hidden = true;
+      if (map2d) map2d.style.display = "";
+      if (!this.map || !this.baseLayers) return;
+      ["street","satellite"].forEach(k => {
+        if (this.map.hasLayer(this.baseLayers[k])) this.map.removeLayer(this.baseLayers[k]);
+      });
+      if (this.map.hasLayer(this.hybridOverlay)) this.map.removeLayer(this.hybridOverlay);
+      if (style === "street") {
+        this.baseLayers.street.addTo(this.map);
+      } else if (style === "hybrid") {
+        this.baseLayers.satellite.addTo(this.map);
+        this.hybridOverlay.addTo(this.map);
+      } else {
+        this.baseLayers.satellite.addTo(this.map);
+      }
+      setTimeout(() => this.map.invalidateSize(), 100);
     }
     this.mapStyle = style;
     document.querySelectorAll(".map-style-btn").forEach(b => b.classList.toggle("active", b.dataset.style === style));
-    setTimeout(() => this.map.invalidateSize(), 100);
   },
 
   renderMarkers() {
@@ -341,8 +458,8 @@ const app = {
       </div>
       <div class="detail-actions"><button class="primary-btn" onclick="app.navigateTo('${p.id}')">🧭 Navigate</button><button class="secondary-btn" onclick="app.toggleFavorite('${p.id}');app.showDetails('${p.id}')">${this.isFavorite(p.id)?"♥ Saved":"♡ Save"}</button></div>
       ${p.id==='main'?`<div class="media-gallery"><h3>Actual Main Block Views</h3><div class="gallery-grid">
-        <figure><img src="media/main-block-front.jpg" alt="Main Block front view"><figcaption>Front approach captured from the uploaded campus video.</figcaption></figure>
-        <figure><img src="media/main-block-close.jpg" alt="Main Block close view"><figcaption>Closer view of the Main Block entrance.</figcaption></figure>
+        <figure><img src="media/main-block-front.jpg" alt="RYMEC Main Block front view"><figcaption>Front approach captured from the uploaded campus video.</figcaption></figure>
+        <figure><img src="media/main-block-close.jpg" alt="RYMEC Main Block entrance close view" loading="lazy" decoding="async"><figcaption>Closer view of the Main Block entrance.</figcaption></figure>
         <figure class="video-badge"><video controls playsinline preload="metadata" poster="media/main-block-front.jpg"><source src="media/main-block.mp4" type="video/mp4"></video><figcaption>Main Block aerial-to-front video.</figcaption></figure>
         <figure class="video-badge"><video controls playsinline preload="metadata" poster="media/aerial-campus.jpg"><source src="media/campus-aerial.mp4" type="video/mp4"></video><figcaption>Campus aerial video used to understand the campus layout.</figcaption></figure>
       </div></div>`:''}
@@ -378,6 +495,7 @@ const app = {
   navigateTo(id) {
     const p=this.places.find(x=>x.id===id); if(!p)return;
     this.show("map");
+    if(this.mapStyle==="3d") this.setMapStyle("satellite");
     this.map.setView([p.lat,p.lng],18);
     this.markers[p.id]?.openPopup();
     if(!this.currentLocation){ this.toast("Allow location access to calculate a route."); this.locate(()=>this.buildRoute(p)); }
@@ -445,11 +563,37 @@ const app = {
     setTimeout(()=>this.addChat("bot",reply),250);
   },
 
+  initAnalyticsConsent(){
+    const choice=localStorage.getItem("analytics_consent");
+    if(choice==="granted") this.loadAnalytics();
+    else if(choice===null) $("#cookieBanner").hidden=false;
+  },
+  setAnalyticsConsent(granted){
+    localStorage.setItem("analytics_consent",granted?"granted":"denied");
+    $("#cookieBanner").hidden=true;
+    if(granted) this.loadAnalytics();
+  },
+  loadAnalytics(){
+    if(window.__analyticsLoaded) return;
+    window.__analyticsLoaded=true;
+    const s=document.createElement("script");
+    s.defer=true;s.src="/_vercel/insights/script.js";
+    document.head.appendChild(s);
+  },
+
   openAdmin(){$("#adminPassword").value="";$("#adminModal").hidden=false;},
   closeAdmin(){$("#adminModal").hidden=true;},
-  loginAdmin(){
-    if($("#adminPassword").value!==CAMPUS_CONFIG.adminPassword){this.toast("Incorrect admin password.");return;}
-    this.closeAdmin();this.renderAdmin();this.show("admin");
+  async loginAdmin(){
+    const password=$("#adminPassword").value;
+    if(!password){this.toast("Enter the admin password.");return;}
+    try{
+      const res=await fetch("/api/admin-login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password})});
+      if(!res.ok){this.toast(res.status===401?"Incorrect admin password.":"Admin login is unavailable.");return;}
+      const data=await res.json();
+      if(!data.ok){this.toast("Incorrect admin password.");return;}
+      sessionStorage.setItem("admin_session","1");
+      this.closeAdmin();this.renderAdmin();this.show("admin");
+    }catch(e){this.toast("Admin login needs the Vercel API and ADMIN_PASSWORD environment variable.");}
   },
   renderAdmin(){
     $("#adminContent").innerHTML=`
@@ -470,9 +614,9 @@ const app = {
     p.lat=parseFloat($("#f_lat").value);p.lng=parseFloat($("#f_lng").value);
     if(!p.name||!Number.isFinite(p.lat)||!Number.isFinite(p.lng)){this.toast("Name and valid coordinates are required.");return;}
     const i=this.places.findIndex(x=>x.id===id); if(i>=0)this.places[i]=p;else this.places.push(p);
-    this.save();modal.remove();this.renderAdmin();this.renderMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();this.toast("Location saved.");
+    this.save();modal.remove();this.renderAdmin();this.renderMarkers();this.render3DMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();this.toast("Location saved.");
   },
-  deletePlace(id){if(confirm("Delete this location?")){this.places=this.places.filter(p=>p.id!==id);this.save();this.renderAdmin();this.renderMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();}},
+  deletePlace(id){if(confirm("Delete this location?")){this.places=this.places.filter(p=>p.id!==id);this.save();this.renderAdmin();this.renderMarkers();this.render3DMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();}},
   resetData(){if(confirm("Reset all locations to demo data?")){this.places=DEFAULT_PLACES;this.save();location.reload();}},
   exportData(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(this.places,null,2)],{type:"application/json"}));a.download="campus-locations.json";a.click();},
   importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d))throw 0;this.places=d;this.save();this.renderAdmin();this.renderMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();this.toast("Locations imported.");}catch{this.toast("Invalid JSON file.");}};r.readAsText(f);},

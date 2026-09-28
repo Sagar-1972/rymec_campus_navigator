@@ -1,21 +1,54 @@
-# Campus Navigator — FIXED Vercel package
+# RYMEC Campus Navigator — Production Build
 
-This version is intentionally self-contained: CSS, configuration and JavaScript are inside index.html. Upload the ZIP contents so Vercel cannot miss local CSS/JS files.
+## Included in this build
 
-## Vercel
-1. Extract this ZIP.
-2. Create a new Vercel project from the extracted folder (or upload the folder using Vercel Drop).
-3. Framework: Other.
-4. Build command: empty.
-5. Output directory: `.`.
-6. Deploy.
+### Phase 1 — Production / SEO
+- Privacy policy and Terms & Conditions
+- HTTPS through Vercel
+- Meta title/description, canonical URL and social preview metadata
+- Favicon and social preview image
+- Sitemap and robots.txt
+- Image alt text and lazy loading
+- Custom 404 page
+- SEO-friendly campus description
+- Basic performance and accessibility improvements
+
+### Phase 2 — Security
+- No admin password is stored in `index.html`
+- Admin login uses `/api/admin-login.js`
+- Set `ADMIN_PASSWORD` as a Vercel Environment Variable
+- Do not put secrets in HTML, JavaScript or Git
+
+### Phase 3 — UX / accessibility
+- Mobile responsive layout
+- Skip-to-content link
+- Contrast-friendly controls
+- Analytics consent banner
+- Better error messages
+- Clear primary actions
+
+### Phase 4 — Campus features
+- Satellite, Standard and Hybrid maps
+- New 3D Campus map using `media/campus-3d-map.png`
+- Clickable 3D place markers
+- Real aerial flyover
+- Main Block photos/video
+- Search, favorites and directory
+- GPS location and route calculation
+- Campus Assistant
+- Admin location management
+
+## Vercel setup
+
+1. Deploy this folder to Vercel.
+2. In Vercel Project Settings → Environment Variables, add:
+   - Name: `ADMIN_PASSWORD`
+   - Value: choose your private admin password
+3. Redeploy after adding the variable.
+4. Never commit the password to GitHub.
 
 ## Important
-Change the admin password and campus coordinates in the inline `CAMPUS_CONFIG` near the beginning of the script before final public deployment.
 
-Demo admin password: admin123
-\n\n## Map styles\n\nThe map opens in Satellite mode and supports Satellite, Standard OpenStreetMap, and Hybrid (satellite with a light map-context overlay). Map attribution is displayed in the map.\n
+The location database is currently browser-local (`localStorage`). Admin edits therefore apply to the browser where they are made. For shared multi-admin production data, move locations/authentication to a real backend such as Supabase or Firebase.
 
-## Vercel Web Analytics
-
-This build includes the Vercel Web Analytics script at `/_vercel/insights/script.js`. In the Vercel project dashboard, open Analytics and enable Web Analytics if prompted, then redeploy this project. After visitors load the deployed site, the Analytics dashboard can show visitors, page views, top pages, referrers and related traffic information.
+The 3D image is intended as a visual campus-orientation layer. Its marker positions are approximate until the exact locations are calibrated.
