@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://rymec-campus-navigator.vercel.app/sitemap.xml
