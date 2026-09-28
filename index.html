@@ -63,7 +63,7 @@
 .legal-copy h3{margin-top:22px}.legal-copy h3:first-child{margin-top:0}
 .cookie-banner{position:fixed;left:16px;right:16px;bottom:82px;z-index:4500;background:#0f172a;color:#fff;border-radius:16px;padding:14px 16px;box-shadow:0 15px 45px #0006;display:flex;gap:14px;align-items:center;justify-content:space-between}
 .cookie-banner p{margin:0;font-size:12px;line-height:1.5;color:#cbd5e1}.cookie-actions{display:flex;gap:8px;flex:none}.cookie-actions button{border:0;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer}.cookie-accept{background:#38bdf8;color:#082f49}.cookie-reject{background:#334155;color:#fff}
-.security-note{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:13px;padding:12px;margin:12px 0;font-size:12px;line-height:1.5}
+.back-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:10px;padding:9px 13px;font-weight:800;cursor:pointer;margin:14px 0 10px}.back-btn:hover{background:#f1f5f9}.cookie-actions button:focus-visible,.back-btn:focus-visible{outline:3px solid #38bdf8;outline-offset:2px}.security-note{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:13px;padding:12px;margin:12px 0;font-size:12px;line-height:1.5}
 .cta-row{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
 @media(max-width:760px){.map-3d-wrap,.map-3d-image{min-height:430px;height:430px}.map3d-marker{font-size:9px;padding:6px 8px}.cookie-banner{bottom:76px;flex-direction:column;align-items:stretch}.cookie-actions{justify-content:flex-end}}
 
@@ -163,6 +163,7 @@
     </section>
 
     <section id="map" class="page">
+      <button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button>
       <div class="page-title"><div><span class="eyebrow">EXPLORE</span><h2>Campus Map</h2></div><button class="secondary-btn" onclick="app.locate()">⌖ Locate me</button></div>
       <div class="map-wrap">
         <div id="mapCanvas"></div>
@@ -198,16 +199,19 @@
     </section>
 
     <section id="favorites" class="page">
+      <button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button>
       <div class="page-title"><div><span class="eyebrow">SAVED</span><h2>Favorites</h2></div></div>
       <div id="favoritesList" class="places-list"></div>
     </section>
 
     <section id="admin" class="page">
+      <button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button>
       <div class="page-title"><div><span class="eyebrow">MANAGE</span><h2>Admin Dashboard</h2></div><button class="secondary-btn" onclick="app.show('home')">Exit</button></div>
       <div id="adminContent"></div>
     </section>
   
     <section id="privacy" class="page">
+      <button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button>
       <div class="page-title"><div><span class="eyebrow">LEGAL</span><h2>Privacy Policy</h2></div></div>
       <div class="legal-copy">
         <h3>What this app does</h3>
@@ -225,6 +229,7 @@
       </div>
     </section>
     <section id="terms" class="page">
+      <button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button>
       <div class="page-title"><div><span class="eyebrow">LEGAL</span><h2>Terms & Conditions</h2></div></div>
       <div class="legal-copy">
         <h3>Use of the navigator</h3>
@@ -321,12 +326,26 @@ const app = {
     this.initAnalyticsConsent();
     window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); this.deferredInstall = e; $("#installBtn").hidden = false; });
     $("#installBtn").onclick = () => this.install();
-    this.show("home");
+    const initialPage = ["home","map","places","details","favorites","admin","privacy","terms"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home";
+    this.currentPage = null;
+    this.show(initialPage, {replace:true, force:true, fromHistory:true});
+    window.addEventListener("popstate", () => {
+      const page = ["home","map","places","details","favorites","admin","privacy","terms"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home";
+      this.show(page, {fromHistory:true, force:true});
+    });
   },
 
   save() { localStorage.setItem("campus_places", JSON.stringify(this.places)); },
 
-  show(id) {
+  show(id, options = {}) {
+    const current = this.currentPage || "home";
+    if (current === id && !options.force) return;
+    if (!options.fromHistory && !options.replace) {
+      history.pushState({page:id}, "", "#" + id);
+    } else if (options.replace) {
+      history.replaceState({page:id}, "", "#" + id);
+    }
+    this.currentPage = id;
     $$(".page").forEach(p => p.classList.remove("active"));
     $("#" + id).classList.add("active");
     $$(".bottom-nav button").forEach(b => b.classList.toggle("active", b.dataset.page === id));
@@ -334,6 +353,11 @@ const app = {
     if (id === "favorites") this.renderFavorites();
     if (id === "places") this.renderPlaces();
     window.scrollTo({top:0,behavior:"smooth"});
+  },
+
+  goBack() {
+    if (history.length > 1 && this.currentPage !== "home") history.back();
+    else this.show("home");
   },
 
   initMap() {
@@ -564,14 +588,19 @@ const app = {
   },
 
   initAnalyticsConsent(){
+    const banner=$("#cookieBanner");
     const choice=localStorage.getItem("analytics_consent");
     if(choice==="granted") this.loadAnalytics();
-    else if(choice===null) $("#cookieBanner").hidden=false;
+    else if(choice==="denied") banner.hidden=true;
+    else banner.hidden=false;
   },
   setAnalyticsConsent(granted){
-    localStorage.setItem("analytics_consent",granted?"granted":"denied");
-    $("#cookieBanner").hidden=true;
+    try { localStorage.setItem("analytics_consent",granted?"granted":"denied"); } catch(e) {}
+    const banner=$("#cookieBanner");
+    banner.hidden=true;
+    banner.setAttribute("aria-hidden","true");
     if(granted) this.loadAnalytics();
+    this.toast(granted?"Analytics enabled.":"Analytics declined.");
   },
   loadAnalytics(){
     if(window.__analyticsLoaded) return;
