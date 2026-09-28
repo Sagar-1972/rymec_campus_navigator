@@ -187,7 +187,6 @@
     </section>
 
     <section id="places" class="page">
-      <button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button>
       <div class="page-title"><div><span class="eyebrow">DIRECTORY</span><h2>Campus Places</h2></div></div>
       <div class="search-box"><span>⌕</span><input id="placesSearch" oninput="app.filterPlaces(this.value)" placeholder="Search places..."></div>
       <div class="chips" id="categoryChips"></div>
@@ -195,7 +194,7 @@
     </section>
 
     <section id="details" class="page">
-      <button class="back-btn" type="button" onclick="app.backFromDetails()" aria-label="Go back">← Back</button>
+      <button class="back-btn" onclick="app.show('places')">← Back</button>
       <div id="detailsContent"></div>
     </section>
 
@@ -329,7 +328,6 @@ const app = {
     $("#installBtn").onclick = () => this.install();
     const initialPage = ["home","map","places","details","favorites","admin","privacy","terms"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home";
     this.currentPage = null;
-    this.detailsReturnPage = "home";
     this.show(initialPage, {replace:true, force:true, fromHistory:true});
     window.addEventListener("popstate", () => {
       const page = ["home","map","places","details","favorites","admin","privacy","terms"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home";
@@ -474,7 +472,6 @@ const app = {
 
   showDetails(id) {
     const p = this.places.find(x=>x.id===id); if(!p) return;
-    this.detailsReturnPage = this.currentPage && this.currentPage !== "details" ? this.currentPage : "home";
     $("#detailsContent").innerHTML = `
       <div class="detail-hero"><div class="big-icon">${this.icon(p.category)}</div><span class="tag">${this.escape(p.category)}</span><h1>${this.escape(p.name)}</h1><p>${this.escape(p.description)}</p></div>
       <div class="detail-grid">
@@ -497,11 +494,6 @@ const app = {
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(m);
       L.marker([p.lat,p.lng]).addTo(m).bindPopup(this.escape(p.name)).openPopup();
     },50);
-  },
-
-  backFromDetails() {
-    const target = this.detailsReturnPage || "home";
-    this.show(target);
   },
 
   openCampusMedia(type) {
