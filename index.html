@@ -331,9 +331,7 @@ const app = {
   lastRerouteAt: 0,
 
   init() {
-    const savedPlaces = JSON.parse(localStorage.getItem("campus_places") || "null");
-    this.places = Array.isArray(savedPlaces) && savedPlaces.length ? savedPlaces : DEFAULT_PLACES;
-    if (!Array.isArray(savedPlaces) || !savedPlaces.length) localStorage.setItem("campus_places", JSON.stringify(DEFAULT_PLACES));
+    this.places = JSON.parse(localStorage.getItem("campus_places") || "null") || DEFAULT_PLACES;
     document.title = CAMPUS_CONFIG.name + " | Campus Navigator";
     $("#brandName").textContent = CAMPUS_CONFIG.shortName;
     this.renderPopular();
@@ -382,7 +380,6 @@ const app = {
     if (id === "map" && this.map) setTimeout(() => this.map.invalidateSize(), 150);
     if (id === "favorites") this.renderFavorites();
     if (id === "places") this.renderPlaces();
-    if (id === "home") this.renderPopular();
     window.scrollTo({top:0,behavior:"smooth"});
   },
 
