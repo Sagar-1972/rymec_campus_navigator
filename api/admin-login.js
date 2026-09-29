@@ -4,13 +4,19 @@ export default function handler(req, res) {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
 
-  const configured = process.env.ADMIN_PASSWORD;
-  if (!configured) {
+  const configuredPassword = process.env.ADMIN_PASSWORD;
+  const configuredUsername = process.env.ADMIN_USERNAME || "admin";
+
+  if (!configuredPassword) {
     return res.status(503).json({ ok: false, error: "ADMIN_PASSWORD is not configured" });
   }
 
-  const password = req.body && req.body.password;
-  if (typeof password !== "string" || password !== configured) {
+  const body = req.body || {};
+  const username = body.username;
+  const password = body.password;
+
+  if (typeof username !== "string" || typeof password !== "string" ||
+      username !== configuredUsername || password !== configuredPassword) {
     return res.status(401).json({ ok: false });
   }
 

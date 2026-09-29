@@ -63,7 +63,7 @@
 .legal-copy h3{margin-top:22px}.legal-copy h3:first-child{margin-top:0}
 .cookie-banner[hidden]{display:none!important}.cookie-banner{position:fixed;left:16px;right:16px;bottom:82px;z-index:4500;background:#0f172a;color:#fff;border-radius:16px;padding:14px 16px;box-shadow:0 15px 45px #0006;display:flex;gap:14px;align-items:center;justify-content:space-between}
 .cookie-banner p{margin:0;font-size:12px;line-height:1.5;color:#cbd5e1}.cookie-actions{display:flex;gap:8px;flex:none}.cookie-actions button{border:0;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer}.cookie-accept{background:#38bdf8;color:#082f49}.cookie-reject{background:#334155;color:#fff}
-.back-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:10px;padding:9px 13px;font-weight:800;cursor:pointer;margin:14px 0 10px}.back-btn:hover{background:#f1f5f9}.cookie-actions button:focus-visible,.back-btn:focus-visible{outline:3px solid #38bdf8;outline-offset:2px}.security-note{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:13px;padding:12px;margin:12px 0;font-size:12px;line-height:1.5}
+.back-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:10px;padding:9px 13px;font-weight:800;cursor:pointer;margin:14px 0 10px}.back-btn:hover{background:#f1f5f9}.cookie-actions button:focus-visible,.back-btn:focus-visible{outline:3px solid #38bdf8;outline-offset:2px}.admin-login-subtitle{margin:8px 0 18px;color:#64748b;font-size:13px;line-height:1.5}.login-label{display:block;color:#334155;font-size:12px;font-weight:800;margin:10px 0 5px}.password-wrap{position:relative}.password-wrap .full-input{padding-right:72px;margin-top:0}.password-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:#f1f5f9;color:#334155;border-radius:8px;padding:7px 9px;font-size:11px;font-weight:800;cursor:pointer}.password-toggle:hover{background:#e2e8f0}.admin-login-btn{margin-top:7px}.admin-login-hint{text-align:center;color:#94a3b8;font-size:11px;margin:12px 0 2px}
 .cta-row{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
 @media(max-width:760px){.map-3d-wrap,.map-3d-image{min-height:430px;height:430px}.map3d-marker{font-size:9px;padding:6px 8px}.cookie-banner{bottom:76px;flex-direction:column;align-items:stretch}.cookie-actions{justify-content:flex-end}}
 
@@ -272,11 +272,19 @@
 
   <div id="adminModal" class="modal" hidden>
     <div class="modal-card small">
-      <div class="modal-head"><h3>Admin Access</h3><button onclick="app.closeAdmin()">×</button></div>
-      <div class="security-note"><b>Secure admin login.</b> The password is checked server-side using the Vercel <code>ADMIN_PASSWORD</code> environment variable. It is not stored in this HTML file.</div>
-      <input id="adminPassword" class="full-input" type="password" placeholder="Admin password">
-      <button class="primary-btn full" onclick="app.loginAdmin()">Open Dashboard</button>
+      <div class="modal-head"><h3>Admin Access</h3><button onclick="app.closeAdmin()" aria-label="Close admin login">×</button></div>
+      <p class="admin-login-subtitle">Sign in to manage campus locations and content.</p>
+      <label class="login-label" for="adminUsername">Username</label>
+      <input id="adminUsername" class="full-input" type="text" placeholder="Admin username" autocomplete="username" autocapitalize="none" spellcheck="false" onkeydown="if(event.key==='Enter')document.getElementById('adminPassword').focus()">
+      <label class="login-label" for="adminPassword">Password</label>
+      <div class="password-wrap">
+        <input id="adminPassword" class="full-input password-input" type="password" placeholder="Admin password" autocomplete="current-password" onkeydown="if(event.key==='Enter')app.loginAdmin()">
+        <button id="toggleAdminPassword" class="password-toggle" type="button" onclick="app.toggleAdminPassword()" aria-label="Show password" aria-pressed="false">Show</button>
+      </div>
+      <button class="primary-btn full admin-login-btn" onclick="app.loginAdmin()">Open Dashboard</button>
+      <p class="admin-login-hint">Your password is securely checked on the server.</p>
     </div>
+  </div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -619,19 +627,31 @@ const app = {
     document.head.appendChild(s);
   },
 
-  openAdmin(){$("#adminPassword").value="";$("#adminModal").hidden=false;},
+  openAdmin(){$("#adminUsername").value="admin";$("#adminPassword").value="";$("#adminPassword").type="password";$("#toggleAdminPassword").textContent="Show";$("#toggleAdminPassword").setAttribute("aria-label","Show password");$("#toggleAdminPassword").setAttribute("aria-pressed","false");$("#adminModal").hidden=false;setTimeout(()=>$("#adminUsername").focus(),50);},
   closeAdmin(){$("#adminModal").hidden=true;},
   async loginAdmin(){
+    const username=(document.getElementById("adminUsername")?.value||"").trim();
     const password=$("#adminPassword").value;
+    if(!username){this.toast("Enter the admin username.");return;}
     if(!password){this.toast("Enter the admin password.");return;}
     try{
-      const res=await fetch("/api/admin-login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password})});
-      if(!res.ok){this.toast(res.status===401?"Incorrect admin password.":"Admin login is unavailable.");return;}
+      const res=await fetch("/api/admin-login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username,password})});
+      if(!res.ok){this.toast(res.status===401?"Incorrect username or password.":"Admin login is unavailable.");return;}
       const data=await res.json();
-      if(!data.ok){this.toast("Incorrect admin password.");return;}
+      if(!data.ok){this.toast("Incorrect username or password.");return;}
       sessionStorage.setItem("admin_session","1");
       this.closeAdmin();this.renderAdmin();this.show("admin");
-    }catch(e){this.toast("Admin login needs the Vercel API and ADMIN_PASSWORD environment variable.");}
+    }catch(e){this.toast("Admin login is temporarily unavailable.");}
+  },
+  toggleAdminPassword(){
+    const input=document.getElementById("adminPassword");
+    const button=document.getElementById("toggleAdminPassword");
+    if(!input||!button)return;
+    const visible=input.type==="text";
+    input.type=visible?"password":"text";
+    button.textContent=visible?"Show":"Hide";
+    button.setAttribute("aria-label",visible?"Show password":"Hide password");
+    button.setAttribute("aria-pressed",String(!visible));
   },
   renderAdmin(){
     $("#adminContent").innerHTML=`

@@ -16,7 +16,7 @@
 ### Phase 2 — Security
 - No admin password is stored in `index.html`
 - Admin login uses `/api/admin-login.js`
-- Set `ADMIN_PASSWORD` as a Vercel Environment Variable
+- Set `ADMIN_PASSWORD` as a Vercel Environment Variable. The admin username defaults to `admin`; optionally set `ADMIN_USERNAME` in Vercel if you want a different username.
 - Do not put secrets in HTML, JavaScript or Git
 
 ### Phase 3 — UX / accessibility
