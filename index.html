@@ -346,19 +346,10 @@ const app = {
     const initialPage = ["home","map","places","details","favorites","admin","privacy","terms"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home";
     this.currentPage = null;
     this.detailsReturnPage = "home";
-    this.navStack = [];
-    this.navHandlingPop = false;
-    const validPages = ["home","map","places","details","favorites","admin","privacy","terms"];
-    const startPage = validPages.includes(initialPage) ? initialPage : "home";
-    history.replaceState({appPage:startPage, appRoot:true}, "", "#" + startPage);
-    this.show(startPage, {replace:true, force:true, fromHistory:true});
-    window.addEventListener("popstate", (event) => {
-      const statePage = event.state && event.state.appPage;
-      const hashPage = location.hash.slice(1);
-      const page = validPages.includes(statePage) ? statePage : (validPages.includes(hashPage) ? hashPage : "home");
-      this.navHandlingPop = true;
+    this.show(initialPage, {replace:true, force:true, fromHistory:true});
+    window.addEventListener("popstate", () => {
+      const page = ["home","map","places","details","favorites","admin","privacy","terms"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home";
       this.show(page, {fromHistory:true, force:true});
-      this.navHandlingPop = false;
     });
   },
 
@@ -368,10 +359,9 @@ const app = {
     const current = this.currentPage || "home";
     if (current === id && !options.force) return;
     if (!options.fromHistory && !options.replace) {
-      if (current && current !== id && !this.navHandlingPop) this.navStack.push(current);
-      history.pushState({appPage:id}, "", "#" + id);
+      history.pushState({page:id}, "", "#" + id);
     } else if (options.replace) {
-      history.replaceState({appPage:id}, "", "#" + id);
+      history.replaceState({page:id}, "", "#" + id);
     }
     this.currentPage = id;
     $$(".page").forEach(p => p.classList.remove("active"));
@@ -384,13 +374,8 @@ const app = {
   },
 
   goBack() {
-    if (this.currentPage === "home") return;
-    const target = this.navStack.length ? this.navStack.pop() : "home";
-    // Replace the current entry instead of calling history.back(). This prevents
-    // the app from getting trapped by duplicate #places/#details entries left
-    // by an earlier session or by repeated category/detail navigation.
-    history.replaceState({appPage:target}, "", "#" + target);
-    this.show(target, {fromHistory:true, force:true});
+    if (history.length > 1 && this.currentPage !== "home") history.back();
+    else this.show("home");
   },
 
   initMap() {
