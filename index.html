@@ -516,8 +516,16 @@ const app = {
   },
 
   backFromDetails() {
-    const target = this.detailsReturnPage || "home";
-    this.show(target);
+    // Return through browser history so we do not create a duplicate page
+    // entry (which previously caused Back to loop between Details and Places).
+    if (location.hash.slice(1) === "details") {
+      const before = this.currentPage;
+      if (before === "details" && history.length > 1) {
+        history.back();
+        return;
+      }
+    }
+    this.show(this.detailsReturnPage || "home", {replace:true});
   },
 
   openCampusMedia(type) {
