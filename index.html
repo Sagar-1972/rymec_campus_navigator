@@ -63,7 +63,7 @@
 .legal-copy h3{margin-top:22px}.legal-copy h3:first-child{margin-top:0}
 .cookie-banner[hidden]{display:none!important}.cookie-banner{position:fixed;left:16px;right:16px;bottom:82px;z-index:4500;background:#0f172a;color:#fff;border-radius:16px;padding:14px 16px;box-shadow:0 15px 45px #0006;display:flex;gap:14px;align-items:center;justify-content:space-between}
 .cookie-banner p{margin:0;font-size:12px;line-height:1.5;color:#cbd5e1}.cookie-actions{display:flex;gap:8px;flex:none}.cookie-actions button{border:0;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer}.cookie-accept{background:#38bdf8;color:#082f49}.cookie-reject{background:#334155;color:#fff}
-.back-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:10px;padding:9px 13px;font-weight:800;cursor:pointer;margin:14px 0 10px}.back-btn:hover{background:#f1f5f9}.subpage-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.home-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:10px;padding:9px 13px;font-weight:800;cursor:pointer;margin:14px 0 10px}.home-btn:hover{background:#dbeafe}.cookie-actions button:focus-visible,.back-btn:focus-visible{outline:3px solid #38bdf8;outline-offset:2px}.admin-login-subtitle{margin:8px 0 18px;color:#64748b;font-size:13px;line-height:1.5}.login-label{display:block;color:#334155;font-size:12px;font-weight:800;margin:10px 0 5px}.password-wrap{position:relative}.password-wrap .full-input{padding-right:72px;margin-top:0}.password-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:#f1f5f9;color:#334155;border-radius:8px;padding:7px 9px;font-size:11px;font-weight:800;cursor:pointer}.password-toggle:hover{background:#e2e8f0}.admin-login-btn{margin-top:7px}.admin-login-hint{text-align:center;color:#94a3b8;font-size:11px;margin:12px 0 2px}
+.back-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:10px;padding:9px 13px;font-weight:800;cursor:pointer;margin:14px 0 10px}.back-btn:hover{background:#f1f5f9}.cookie-actions button:focus-visible,.back-btn:focus-visible{outline:3px solid #38bdf8;outline-offset:2px}.admin-login-subtitle{margin:8px 0 18px;color:#64748b;font-size:13px;line-height:1.5}.login-label{display:block;color:#334155;font-size:12px;font-weight:800;margin:10px 0 5px}.password-wrap{position:relative}.password-wrap .full-input{padding-right:72px;margin-top:0}.password-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:#f1f5f9;color:#334155;border-radius:8px;padding:7px 9px;font-size:11px;font-weight:800;cursor:pointer}.password-toggle:hover{background:#e2e8f0}.admin-login-btn{margin-top:7px}.admin-login-hint{text-align:center;color:#94a3b8;font-size:11px;margin:12px 0 2px}
 .cta-row{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
 @media(max-width:760px){.map-3d-wrap,.map-3d-image{min-height:430px;height:430px}.map3d-marker{font-size:9px;padding:6px 8px}.cookie-banner{bottom:76px;flex-direction:column;align-items:stretch}.cookie-actions{justify-content:flex-end}}
 
@@ -84,7 +84,7 @@
   <div id="toast" class="toast"></div>
 
   <header class="topbar">
-    <div class="brand" onclick="app.goHome()">
+    <div class="brand" onclick="app.show('home')">
       <img class="brand-mark" src="media/college-logo.jpg" alt="RYMEC logo">
       <div>
         <strong id="brandName">Campus Navigator</strong>
@@ -163,7 +163,7 @@
     </section>
 
     <section id="map" class="page">
-      <div class="subpage-actions"><button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button><button class="home-btn" type="button" onclick="app.goHome()" aria-label="Go to home">⌂ Home</button></div>
+      <button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button>
       <div class="page-title"><div><span class="eyebrow">EXPLORE</span><h2>Campus Map</h2></div><button class="secondary-btn" onclick="app.locate()">⌖ Locate me</button></div>
       <div class="map-wrap">
         <div id="mapCanvas"></div>
@@ -187,7 +187,7 @@
     </section>
 
     <section id="places" class="page">
-      <div class="subpage-actions"><button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button><button class="home-btn" type="button" onclick="app.goHome()" aria-label="Go to home">⌂ Home</button></div>
+      <button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button>
       <div class="page-title"><div><span class="eyebrow">DIRECTORY</span><h2>Campus Places</h2></div></div>
       <div class="search-box"><span>⌕</span><input id="placesSearch" oninput="app.filterPlaces(this.value)" placeholder="Search places..."></div>
       <div class="chips" id="categoryChips"></div>
@@ -195,24 +195,24 @@
     </section>
 
     <section id="details" class="page">
-      <div class="subpage-actions"><button class="back-btn" type="button" onclick="app.backFromDetails()" aria-label="Go back">← Back</button><button class="home-btn" type="button" onclick="app.goHome()" aria-label="Go to home">⌂ Home</button></div>
+      <button class="back-btn" type="button" onclick="app.backFromDetails()" aria-label="Go back">← Back</button>
       <div id="detailsContent"></div>
     </section>
 
     <section id="favorites" class="page">
-      <div class="subpage-actions"><button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button><button class="home-btn" type="button" onclick="app.goHome()" aria-label="Go to home">⌂ Home</button></div>
+      <button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button>
       <div class="page-title"><div><span class="eyebrow">SAVED</span><h2>Favorites</h2></div></div>
       <div id="favoritesList" class="places-list"></div>
     </section>
 
     <section id="admin" class="page">
-      <div class="subpage-actions"><button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button><button class="home-btn" type="button" onclick="app.goHome()" aria-label="Go to home">⌂ Home</button></div>
-      <div class="page-title"><div><span class="eyebrow">MANAGE</span><h2>Admin Dashboard</h2></div><button class="secondary-btn" onclick="app.goHome()">Exit</button></div>
+      <button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button>
+      <div class="page-title"><div><span class="eyebrow">MANAGE</span><h2>Admin Dashboard</h2></div><button class="secondary-btn" onclick="app.show('home')">Exit</button></div>
       <div id="adminContent"></div>
     </section>
   
     <section id="privacy" class="page">
-      <div class="subpage-actions"><button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button><button class="home-btn" type="button" onclick="app.goHome()" aria-label="Go to home">⌂ Home</button></div>
+      <button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button>
       <div class="page-title"><div><span class="eyebrow">LEGAL</span><h2>Privacy Policy</h2></div></div>
       <div class="legal-copy">
         <h3>What this app does</h3>
@@ -230,7 +230,7 @@
       </div>
     </section>
     <section id="terms" class="page">
-      <div class="subpage-actions"><button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button><button class="home-btn" type="button" onclick="app.goHome()" aria-label="Go to home">⌂ Home</button></div>
+      <button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button>
       <div class="page-title"><div><span class="eyebrow">LEGAL</span><h2>Terms & Conditions</h2></div></div>
       <div class="legal-copy">
         <h3>Use of the navigator</h3>
@@ -248,10 +248,10 @@
 
   </main>
 
-  <footer class="footer"><span>© RYMEC Campus Navigator</span> · <a href="#privacy" onclick="app.show('privacy')">Privacy</a> · <a href="#terms" onclick="app.show('terms')">Terms</a> · <a href="#home" onclick="app.goHome()">Home</a></footer>
+  <footer class="footer"><span>© RYMEC Campus Navigator</span> · <a href="#privacy" onclick="app.show('privacy')">Privacy</a> · <a href="#terms" onclick="app.show('terms')">Terms</a> · <a href="#home" onclick="app.show('home')">Home</a></footer>
 
   <nav class="bottom-nav">
-    <button data-page="home" onclick="app.goHome()">⌂<span>Home</span></button>
+    <button data-page="home" onclick="app.show('home')">⌂<span>Home</span></button>
     <button data-page="map" onclick="app.show('map')">⌖<span>Map</span></button>
     <button data-page="places" onclick="app.show('places')">☷<span>Places</span></button>
     <button data-page="favorites" onclick="app.show('favorites')">♥<span>Saved</span></button>
@@ -346,13 +346,9 @@ const app = {
     const initialPage = ["home","map","places","details","favorites","admin","privacy","terms"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home";
     this.currentPage = null;
     this.detailsReturnPage = "home";
-    this.navStack = [initialPage];
     this.show(initialPage, {replace:true, force:true, fromHistory:true});
-    window.addEventListener("popstate", (event) => {
+    window.addEventListener("popstate", () => {
       const page = ["home","map","places","details","favorites","admin","privacy","terms"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home";
-      const idx = this.navStack.lastIndexOf(page);
-      if (idx >= 0) this.navStack = this.navStack.slice(0, idx + 1);
-      else this.navStack = [page];
       this.show(page, {fromHistory:true, force:true});
     });
   },
@@ -363,11 +359,9 @@ const app = {
     const current = this.currentPage || "home";
     if (current === id && !options.force) return;
     if (!options.fromHistory && !options.replace) {
-      if (!Array.isArray(this.navStack)) this.navStack = [current];
-      if (this.navStack[this.navStack.length - 1] !== id) this.navStack.push(id);
-      history.pushState({page:id, navIndex:this.navStack.length - 1}, "", "#" + id);
+      history.pushState({page:id}, "", "#" + id);
     } else if (options.replace) {
-      history.replaceState({page:id, navIndex:0}, "", "#" + id);
+      history.replaceState({page:id}, "", "#" + id);
     }
     this.currentPage = id;
     $$(".page").forEach(p => p.classList.remove("active"));
@@ -379,24 +373,9 @@ const app = {
     window.scrollTo({top:0,behavior:"smooth"});
   },
 
-  goHome() {
-    this.navStack = ["home"];
-    this.currentPage = null;
-    history.replaceState({page:"home", navIndex:0}, "", "#home");
-    this.show("home", {fromHistory:true, force:true});
-  },
-
   goBack() {
-    if (!Array.isArray(this.navStack) || this.navStack.length <= 1) {
-      this.navStack = ["home"];
-      this.show("home", {replace:true, force:true, fromHistory:true});
-      return;
-    }
-    this.navStack.pop();
-    const target = this.navStack[this.navStack.length - 1] || "home";
-    this.currentPage = null;
-    history.replaceState({page:target, navIndex:this.navStack.length - 1}, "", "#" + target);
-    this.show(target, {fromHistory:true, force:true});
+    if (history.length > 1 && this.currentPage !== "home") history.back();
+    else this.show("home");
   },
 
   initMap() {
