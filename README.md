@@ -52,3 +52,9 @@
 The location database is currently browser-local (`localStorage`). Admin edits therefore apply to the browser where they are made. For shared multi-admin production data, move locations/authentication to a real backend such as Supabase or Firebase.
 
 The 3D image is intended as a visual campus-orientation layer. Its marker positions are approximate until the exact locations are calibrated.
+
+## Security hardening
+
+This deployment includes HTTP security headers configured in `vercel.json` (CSP, X-Content-Type-Options, X-Frame-Options, Referrer-Policy and Permissions-Policy) and Subresource Integrity for the Leaflet CDN assets.
+
+The admin password is checked by the Vercel serverless endpoint using the `ADMIN_PASSWORD` environment variable. The admin editing UI stores its demo data in the browser, so this should not be treated as a multi-user production CMS or as a secure database-backed administration system.
