@@ -374,22 +374,8 @@ const app = {
   },
 
   goBack() {
-    const current = this.currentPage || "home";
-    const fallback = {
-      details: this.detailsReturnPage || "home",
-      places: "home",
-      map: "home",
-      favorites: "home",
-      admin: "home",
-      privacy: "home",
-      terms: "home"
-    }[current] || "home";
-    if (current === "home") return;
-    if (history.length > 1 && history.state && history.state.page && history.state.page !== current) {
-      history.back();
-      return;
-    }
-    this.show(fallback);
+    if (history.length > 1 && this.currentPage !== "home") history.back();
+    else this.show("home");
   },
 
   initMap() {
