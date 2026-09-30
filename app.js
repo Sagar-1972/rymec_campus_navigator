@@ -39,12 +39,14 @@ const app = {
   lastHeading: 0,
   lastRerouteAt: 0,
 
-  init() {
+  currentPlacesCategory: "All",
+init() {
     this.places = JSON.parse(localStorage.getItem("campus_places") || "null") || DEFAULT_PLACES;
     document.title = CAMPUS_CONFIG.name + " | Campus Navigator";
     $("#brandName").textContent = CAMPUS_CONFIG.shortName;
     this.renderPopular();
-    this.renderPlaces();
+    this.currentPlacesCategory = "All";
+    this.renderPlaces("", this.currentPlacesCategory);
     this.renderCategories();
     this.renderFavorites();
     this.initMap();
@@ -52,6 +54,15 @@ const app = {
     this.initAnalyticsConsent();
     window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); this.deferredInstall = e; $("#installBtn").hidden = false; });
     $("#installBtn").onclick = () => this.install();
+
+    // Home buttons: bind directly so navigation also works when inline
+    // event handlers are restricted by the site's Content Security Policy.
+    $$("[data-home-button]").forEach(btn => {
+      btn.addEventListener("click", e => {
+        e.preventDefault();
+        this.show("home");
+      });
+    });
     const initialPage = ["home","map","places","details","favorites","admin","privacy","terms"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home";
     this.currentPage = null;
     this.detailsReturnPage = "home";
@@ -78,7 +89,14 @@ const app = {
     $$(".bottom-nav button").forEach(b => b.classList.toggle("active", b.dataset.page === id));
     if (id === "map" && this.map) setTimeout(() => this.map.invalidateSize(), 150);
     if (id === "favorites") this.renderFavorites();
-    if (id === "places") this.renderPlaces();
+    if (id === "places") {
+      const search = $("#placesSearch")?.value || "";
+      this.renderPlaces(search, this.currentPlacesCategory || "All");
+      $$(".chip").forEach(c => c.classList.toggle(
+        "active",
+        c.textContent === (this.currentPlacesCategory || "All")
+      ));
+    }
     window.scrollTo({top:0,behavior:"smooth"});
   },
 
@@ -169,13 +187,19 @@ const app = {
     $("#placesList").innerHTML = list.length ? list.map(p=>this.placeCard(p,true)).join("") : `<div class="empty">No matching places found.</div>`;
   },
 
-  filterPlaces(v) { this.renderPlaces(v); },
+  filterPlaces(v) {
+    this.renderPlaces(v, this.currentPlacesCategory || "All");
+  },
 
   openCategories(cat) {
-    this.show("places");
+    this.currentPlacesCategory = cat || "All";
     $("#placesSearch").value = "";
-    this.renderPlaces("",cat);
-    $$(".chip").forEach(c => c.classList.toggle("active", c.textContent===cat));
+    this.show("places");
+    this.renderPlaces("", this.currentPlacesCategory);
+    $$(".chip").forEach(c => c.classList.toggle(
+      "active",
+      c.textContent === this.currentPlacesCategory
+    ));
   },
 
   renderCategories() {
@@ -184,8 +208,12 @@ const app = {
   },
 
   category(cat) {
-    $$(".chip").forEach(c=>c.classList.toggle("active",c.textContent===cat));
-    this.renderPlaces($("#placesSearch").value,cat);
+    this.currentPlacesCategory = cat || "All";
+    $$(".chip").forEach(c => c.classList.toggle(
+      "active",
+      c.textContent === this.currentPlacesCategory
+    ));
+    this.renderPlaces($("#placesSearch").value, this.currentPlacesCategory);
   },
 
   placeCard(p, detailed=false) {
@@ -225,8 +253,14 @@ const app = {
   },
 
   backFromDetails() {
-    const target = this.detailsReturnPage || "home";
-    this.show(target);
+    // Details was opened from the current page, so go back through
+    // browser history instead of calling show(), which would create
+    // another history entry and cause the Details ↔ Places loop.
+    if (history.length > 1) {
+      history.back();
+    } else {
+      this.show("home", {replace:true});
+    }
   },
 
   openCampusMedia(type) {
@@ -244,8 +278,11 @@ const app = {
     q=(q||"").trim();
     if(!q){this.show("places");return;}
     const found=this.places.find(p=>[p.name,p.category,p.building,p.room].join(" ").toLowerCase().includes(q.toLowerCase()));
-    this.show("places"); $("#placesSearch").value=q;
-    this.renderPlaces(q);
+    this.currentPlacesCategory = "All";
+    this.show("places");
+    $("#placesSearch").value=q;
+    this.renderPlaces(q, "All");
+    $$(".chip").forEach(c => c.classList.toggle("active", c.textContent === "All"));
     if(found){ this.map.setView([found.lat,found.lng],18); this.markers[found.id]?.openPopup(); }
   },
 
@@ -561,3 +598,4 @@ const app = {
 };
 
 document.addEventListener("DOMContentLoaded",()=>app.init());
+
