@@ -63,7 +63,7 @@
 .legal-copy h3{margin-top:22px}.legal-copy h3:first-child{margin-top:0}
 .cookie-banner[hidden]{display:none!important}.cookie-banner{position:fixed;left:16px;right:16px;bottom:82px;z-index:4500;background:#0f172a;color:#fff;border-radius:16px;padding:14px 16px;box-shadow:0 15px 45px #0006;display:flex;gap:14px;align-items:center;justify-content:space-between}
 .cookie-banner p{margin:0;font-size:12px;line-height:1.5;color:#cbd5e1}.cookie-actions{display:flex;gap:8px;flex:none}.cookie-actions button{border:0;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer}.cookie-accept{background:#38bdf8;color:#082f49}.cookie-reject{background:#334155;color:#fff}
-.back-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:10px;padding:9px 13px;font-weight:800;cursor:pointer;margin:14px 0 10px}.back-btn:hover{background:#f1f5f9}.cookie-actions button:focus-visible,.back-btn:focus-visible{outline:3px solid #38bdf8;outline-offset:2px}.admin-login-subtitle{margin:8px 0 18px;color:#64748b;font-size:13px;line-height:1.5}.login-label{display:block;color:#334155;font-size:12px;font-weight:800;margin:10px 0 5px}.password-wrap{position:relative}.password-wrap .full-input{padding-right:72px;margin-top:0}.password-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:#f1f5f9;color:#334155;border-radius:8px;padding:7px 9px;font-size:11px;font-weight:800;cursor:pointer}.password-toggle:hover{background:#e2e8f0}.admin-login-btn{margin-top:7px}.admin-login-hint{text-align:center;color:#94a3b8;font-size:11px;margin:12px 0 2px}
+.back-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:10px;padding:9px 13px;font-weight:800;cursor:pointer;margin:14px 0 10px}.page-nav-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:14px 0 10px}.page-nav-actions .back-btn{margin:0}.home-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid #2563eb;background:#2563eb;color:#fff;border-radius:10px;padding:9px 13px;font-weight:800;cursor:pointer}.home-btn:hover{background:#1d4ed8}.home-btn:focus-visible{outline:3px solid #38bdf8;outline-offset:2px}.back-btn:hover{background:#f1f5f9}.cookie-actions button:focus-visible,.back-btn:focus-visible{outline:3px solid #38bdf8;outline-offset:2px}.admin-login-subtitle{margin:8px 0 18px;color:#64748b;font-size:13px;line-height:1.5}.login-label{display:block;color:#334155;font-size:12px;font-weight:800;margin:10px 0 5px}.password-wrap{position:relative}.password-wrap .full-input{padding-right:72px;margin-top:0}.password-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:#f1f5f9;color:#334155;border-radius:8px;padding:7px 9px;font-size:11px;font-weight:800;cursor:pointer}.password-toggle:hover{background:#e2e8f0}.admin-login-btn{margin-top:7px}.admin-login-hint{text-align:center;color:#94a3b8;font-size:11px;margin:12px 0 2px}
 .cta-row{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
 @media(max-width:760px){.map-3d-wrap,.map-3d-image{min-height:430px;height:430px}.map3d-marker{font-size:9px;padding:6px 8px}.cookie-banner{bottom:76px;flex-direction:column;align-items:stretch}.cookie-actions{justify-content:flex-end}}
 
@@ -163,7 +163,7 @@
     </section>
 
     <section id="map" class="page">
-      <button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button>
+      <div class="page-nav-actions"><button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button><button class="home-btn" type="button" data-home-button onclick="app.show('home')" aria-label="Go to Home">⌂ Home</button></div>
       <div class="page-title"><div><span class="eyebrow">EXPLORE</span><h2>Campus Map</h2></div><button class="secondary-btn" onclick="app.locate()">⌖ Locate me</button></div>
       <div class="map-wrap">
         <div id="mapCanvas"></div>
@@ -187,7 +187,7 @@
     </section>
 
     <section id="places" class="page">
-      <button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button>
+      <div class="page-nav-actions"><button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button><button class="home-btn" type="button" data-home-button onclick="app.show('home')" aria-label="Go to Home">⌂ Home</button></div>
       <div class="page-title"><div><span class="eyebrow">DIRECTORY</span><h2>Campus Places</h2></div></div>
       <div class="search-box"><span>⌕</span><input id="placesSearch" oninput="app.filterPlaces(this.value)" placeholder="Search places..."></div>
       <div class="chips" id="categoryChips"></div>
@@ -195,24 +195,24 @@
     </section>
 
     <section id="details" class="page">
-      <button class="back-btn" type="button" onclick="app.backFromDetails()" aria-label="Go back">← Back</button>
+      <div class="page-nav-actions"><button class="back-btn" type="button" onclick="app.backFromDetails()" aria-label="Go back">← Back</button><button class="home-btn" type="button" data-home-button onclick="app.show('home')" aria-label="Go to Home">⌂ Home</button></div>
       <div id="detailsContent"></div>
     </section>
 
     <section id="favorites" class="page">
-      <button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button>
+      <div class="page-nav-actions"><button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button><button class="home-btn" type="button" data-home-button onclick="app.show('home')" aria-label="Go to Home">⌂ Home</button></div>
       <div class="page-title"><div><span class="eyebrow">SAVED</span><h2>Favorites</h2></div></div>
       <div id="favoritesList" class="places-list"></div>
     </section>
 
     <section id="admin" class="page">
-      <button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button>
+      <div class="page-nav-actions"><button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button><button class="home-btn" type="button" data-home-button onclick="app.show('home')" aria-label="Go to Home">⌂ Home</button></div>
       <div class="page-title"><div><span class="eyebrow">MANAGE</span><h2>Admin Dashboard</h2></div><button class="secondary-btn" onclick="app.show('home')">Exit</button></div>
       <div id="adminContent"></div>
     </section>
   
     <section id="privacy" class="page">
-      <button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button>
+      <div class="page-nav-actions"><button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button><button class="home-btn" type="button" data-home-button onclick="app.show('home')" aria-label="Go to Home">⌂ Home</button></div>
       <div class="page-title"><div><span class="eyebrow">LEGAL</span><h2>Privacy Policy</h2></div></div>
       <div class="legal-copy">
         <h3>What this app does</h3>
@@ -230,7 +230,7 @@
       </div>
     </section>
     <section id="terms" class="page">
-      <button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button>
+      <div class="page-nav-actions"><button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button><button class="home-btn" type="button" data-home-button onclick="app.show('home')" aria-label="Go to Home">⌂ Home</button></div>
       <div class="page-title"><div><span class="eyebrow">LEGAL</span><h2>Terms & Conditions</h2></div></div>
       <div class="legal-copy">
         <h3>Use of the navigator</h3>
@@ -330,12 +330,14 @@ const app = {
   lastHeading: 0,
   lastRerouteAt: 0,
 
-  init() {
+  currentPlacesCategory: "All",
+init() {
     this.places = JSON.parse(localStorage.getItem("campus_places") || "null") || DEFAULT_PLACES;
     document.title = CAMPUS_CONFIG.name + " | Campus Navigator";
     $("#brandName").textContent = CAMPUS_CONFIG.shortName;
     this.renderPopular();
-    this.renderPlaces();
+    this.currentPlacesCategory = "All";
+    this.renderPlaces("", this.currentPlacesCategory);
     this.renderCategories();
     this.renderFavorites();
     this.initMap();
@@ -343,6 +345,15 @@ const app = {
     this.initAnalyticsConsent();
     window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); this.deferredInstall = e; $("#installBtn").hidden = false; });
     $("#installBtn").onclick = () => this.install();
+
+    // Home buttons: bind directly so navigation also works when inline
+    // event handlers are restricted by the site's Content Security Policy.
+    $$("[data-home-button]").forEach(btn => {
+      btn.addEventListener("click", e => {
+        e.preventDefault();
+        this.show("home");
+      });
+    });
     const initialPage = ["home","map","places","details","favorites","admin","privacy","terms"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "home";
     this.currentPage = null;
     this.detailsReturnPage = "home";
@@ -369,7 +380,14 @@ const app = {
     $$(".bottom-nav button").forEach(b => b.classList.toggle("active", b.dataset.page === id));
     if (id === "map" && this.map) setTimeout(() => this.map.invalidateSize(), 150);
     if (id === "favorites") this.renderFavorites();
-    if (id === "places") this.renderPlaces();
+    if (id === "places") {
+      const search = $("#placesSearch")?.value || "";
+      this.renderPlaces(search, this.currentPlacesCategory || "All");
+      $$(".chip").forEach(c => c.classList.toggle(
+        "active",
+        c.textContent === (this.currentPlacesCategory || "All")
+      ));
+    }
     window.scrollTo({top:0,behavior:"smooth"});
   },
 
@@ -460,13 +478,19 @@ const app = {
     $("#placesList").innerHTML = list.length ? list.map(p=>this.placeCard(p,true)).join("") : `<div class="empty">No matching places found.</div>`;
   },
 
-  filterPlaces(v) { this.renderPlaces(v); },
+  filterPlaces(v) {
+    this.renderPlaces(v, this.currentPlacesCategory || "All");
+  },
 
   openCategories(cat) {
-    this.show("places");
+    this.currentPlacesCategory = cat || "All";
     $("#placesSearch").value = "";
-    this.renderPlaces("",cat);
-    $$(".chip").forEach(c => c.classList.toggle("active", c.textContent===cat));
+    this.show("places");
+    this.renderPlaces("", this.currentPlacesCategory);
+    $$(".chip").forEach(c => c.classList.toggle(
+      "active",
+      c.textContent === this.currentPlacesCategory
+    ));
   },
 
   renderCategories() {
@@ -475,8 +499,12 @@ const app = {
   },
 
   category(cat) {
-    $$(".chip").forEach(c=>c.classList.toggle("active",c.textContent===cat));
-    this.renderPlaces($("#placesSearch").value,cat);
+    this.currentPlacesCategory = cat || "All";
+    $$(".chip").forEach(c => c.classList.toggle(
+      "active",
+      c.textContent === this.currentPlacesCategory
+    ));
+    this.renderPlaces($("#placesSearch").value, this.currentPlacesCategory);
   },
 
   placeCard(p, detailed=false) {
@@ -516,8 +544,14 @@ const app = {
   },
 
   backFromDetails() {
-    const target = this.detailsReturnPage || "home";
-    this.show(target);
+    // Details was opened from the current page, so go back through
+    // browser history instead of calling show(), which would create
+    // another history entry and cause the Details ↔ Places loop.
+    if (history.length > 1) {
+      history.back();
+    } else {
+      this.show("home", {replace:true});
+    }
   },
 
   openCampusMedia(type) {
@@ -535,8 +569,11 @@ const app = {
     q=(q||"").trim();
     if(!q){this.show("places");return;}
     const found=this.places.find(p=>[p.name,p.category,p.building,p.room].join(" ").toLowerCase().includes(q.toLowerCase()));
-    this.show("places"); $("#placesSearch").value=q;
-    this.renderPlaces(q);
+    this.currentPlacesCategory = "All";
+    this.show("places");
+    $("#placesSearch").value=q;
+    this.renderPlaces(q, "All");
+    $$(".chip").forEach(c => c.classList.toggle("active", c.textContent === "All"));
     if(found){ this.map.setView([found.lat,found.lng],18); this.markers[found.id]?.openPopup(); }
   },
 
