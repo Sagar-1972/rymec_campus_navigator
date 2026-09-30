@@ -573,10 +573,64 @@ init() {
   newPlace(){this.editPlace(null);},
   editPlace(id){
     const p=id?this.places.find(x=>x.id===id):{id:"p"+Date.now(),name:"",category:"Classroom",description:"",building:"",floor:"",room:"",lat:CAMPUS_CONFIG.center[0],lng:CAMPUS_CONFIG.center[1]};
-    const modal=document.createElement("div");modal.className="modal";modal.innerHTML=`<div class="modal-card"><div class="modal-head"><h3>${id?"Edit":"Add"} location</h3><button onclick="this.closest('.modal').remove()">×</button></div>
-    <div class="form-grid">${["name","category","description","building","floor","room","lat","lng"].map(k=>`<label>${k.toUpperCase()}<input id="f_${k}" value="${this.escapeAttr(p[k]??"")}"></label>`).join("")}</div>
-    <button class="primary-btn full" onclick="app.savePlace('${p.id}',this.closest('.modal'))">Save location</button></div>`;
+    const modal=document.createElement("div");modal.className="modal";modal.innerHTML=`<div class="modal-card location-editor"><div class="modal-head"><h3>${id?"Edit":"Add"} location</h3><button type="button" data-close>×</button></div>
+    <div class="form-grid">
+      <label>NAME<input id="f_name" value="${this.escapeAttr(p.name)}"></label>
+      <label>CATEGORY<select id="f_category"><option>Classroom</option><option>Laboratory</option><option>Office</option><option>Facility</option><option>Building</option></select></label>
+      <label>DESCRIPTION<input id="f_description" value="${this.escapeAttr(p.description)}"></label>
+      <label>BUILDING<input id="f_building" value="${this.escapeAttr(p.building)}"></label>
+      <label>FLOOR<input id="f_floor" value="${this.escapeAttr(p.floor)}"></label>
+      <label>ROOM<input id="f_room" value="${this.escapeAttr(p.room)}"></label>
+    </div>
+    <div class="coordinate-panel">
+      <div class="coordinate-title"><span>📍 Exact location</span><small>Choose coordinates without typing them manually</small></div>
+      <div class="coordinate-fields"><label>LATITUDE<input id="f_lat" inputmode="decimal" value="${this.escapeAttr(p.lat)}"></label><label>LONGITUDE<input id="f_lng" inputmode="decimal" value="${this.escapeAttr(p.lng)}"></label></div>
+      <div class="coordinate-actions"><button type="button" class="secondary-btn" data-pick>🗺️ Pick on Map</button><button type="button" class="secondary-btn" data-gps>📍 Use My GPS</button></div>
+      <p class="coordinate-help">Tip: On the satellite map, click the exact spot or drag the marker. GPS needs location permission.</p>
+    </div>
+    <button type="button" class="primary-btn full" data-save>Save location</button></div>`;
     document.body.appendChild(modal);
+    $("#f_category").value=p.category||"Classroom";
+    modal.querySelector("[data-close]").addEventListener("click",()=>modal.remove());
+    modal.querySelector("[data-save]").addEventListener("click",()=>this.savePlace(p.id,modal));
+    modal.querySelector("[data-pick]").addEventListener("click",()=>this.openCoordinatePicker(modal));
+    modal.querySelector("[data-gps]").addEventListener("click",()=>this.useAdminGPS(modal));
+  },
+
+  updateAdminCoordinates(lat,lng,modal){
+    const la=Number(lat),lo=Number(lng);
+    if(!Number.isFinite(la)||!Number.isFinite(lo)) return;
+    modal.querySelector("#f_lat").value=la.toFixed(7);
+    modal.querySelector("#f_lng").value=lo.toFixed(7);
+  },
+
+  useAdminGPS(modal){
+    if(!navigator.geolocation){this.toast("GPS is not supported by this browser.");return;}
+    this.toast("Requesting your location…");
+    navigator.geolocation.getCurrentPosition(pos=>{
+      this.updateAdminCoordinates(pos.coords.latitude,pos.coords.longitude,modal);
+      this.toast(`GPS location captured (±${Math.round(pos.coords.accuracy)} m).`);
+    },err=>{
+      const msg=err.code===1?"Location permission was denied.":err.code===2?"Your location could not be determined.":"GPS request timed out.";
+      this.toast(msg);
+    },{enableHighAccuracy:true,timeout:12000,maximumAge:0});
+  },
+
+  openCoordinatePicker(parentModal){
+    const lat=parseFloat(parentModal.querySelector("#f_lat").value);
+    const lng=parseFloat(parentModal.querySelector("#f_lng").value);
+    const center=Number.isFinite(lat)&&Number.isFinite(lng)?[lat,lng]:CAMPUS_CONFIG.center;
+    const picker=document.createElement("div");picker.className="modal coordinate-picker-modal";picker.innerHTML=`<div class="modal-card coordinate-picker-card"><div class="modal-head"><div><h3>Pick exact location</h3><p class="muted" style="margin:4px 0 0">Tap the map or drag the marker to the exact building entrance or facility.</p></div><button type="button" data-close>×</button></div><div id="adminPickerMap" class="admin-picker-map"></div><div class="picker-bottom"><div><b data-picker-coords>Lat ${center[0].toFixed(7)} · Lng ${center[1].toFixed(7)}</b><small>Satellite imagery</small></div><button type="button" class="primary-btn" data-use>Use this location</button></div></div>`;
+    document.body.appendChild(picker);
+    const map=L.map("adminPickerMap",{zoomControl:true}).setView(center,19);
+    const satellite=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:20,attribution:'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'}).addTo(map);
+    let marker=L.marker(center,{draggable:true}).addTo(map);
+    const setPoint=(ll)=>{const a=ll.lat,b=ll.lng;marker.setLatLng([a,b]);picker.querySelector("[data-picker-coords]").textContent=`Lat ${a.toFixed(7)} · Lng ${b.toFixed(7)}`;};
+    map.on("click",e=>setPoint(e.latlng));
+    marker.on("dragend",()=>setPoint(marker.getLatLng()));
+    picker.querySelector("[data-use]").addEventListener("click",()=>{const ll=marker.getLatLng();this.updateAdminCoordinates(ll.lat,ll.lng,parentModal);map.remove();picker.remove();});
+    picker.querySelector("[data-close]").addEventListener("click",()=>{map.remove();picker.remove();});
+    setTimeout(()=>map.invalidateSize(),80);
   },
   savePlace(id,modal){
     const p={id};["name","category","description","building","floor","room"].forEach(k=>p[k]=$("#f_"+k).value.trim());
