@@ -141,7 +141,15 @@ async init() {
     $$(".page").forEach(p => p.classList.remove("active"));
     $("#" + id).classList.add("active");
     $$(".bottom-nav button").forEach(b => b.classList.toggle("active", b.dataset.page === id));
-    if (id === "map" && this.map) setTimeout(() => this.map.invalidateSize(), 150);
+    if (id === "map" && this.map) {
+      // Opening Campus Map itself should show the 3D campus overview, not a previous navigation session.
+      this.stopNavigation(true);
+      if (this.routeLine) { this.routeLine.remove(); this.routeLine = null; }
+      this.navigationDestination = null;
+      this.setMapStyle("3d");
+      this.render3DMarkers();
+      setTimeout(() => this.map.invalidateSize(), 150);
+    }
     if (id === "favorites") this.renderFavorites();
     if (id === "places") {
       const search = $("#placesSearch")?.value || "";
@@ -178,6 +186,8 @@ async init() {
     this.renderMarkers();
     this.renderCampusRoutes();
     this.render3DMarkers();
+    // Campus Map opens in the visual 3D campus view by default.
+    this.setMapStyle("3d");
   },
 
   renderCampusRoutes(){
@@ -504,10 +514,9 @@ async init() {
     const d=end?this.map.distance(this.currentLocation,[end[1],end[0]]):0;
     const icon=({left:'↰',right:'↱',straight:'↑',slight_left:'↖',slight_right:'↗',sharp_left:'↙',sharp_right:'↘',uturn:'↶'}[step.maneuver?.modifier]||'↑');
     const text=this.formatStep(step);
-    const distanceText=d>=1000?(d/1000).toFixed(1)+' km':Math.max(1,Math.round(d))+' m';
     const total=this.navigationSteps.length;
     $("#routePanel").hidden=false;
-    $("#routePanel").innerHTML=`<div class="nav-direction"><div class="nav-turn">${icon}</div><div class="nav-copy"><strong>${this.escape(text)}</strong><small>${distanceText} · Step ${Math.min(next+1,total)} of ${total}</small></div></div><div class="nav-progress"><i id="navProgress"></i></div>`;
+    $("#routePanel").innerHTML=`<div class="nav-direction"><div class="nav-turn">${icon}</div><div class="nav-copy"><strong>${this.escape(text)}</strong><small>Step ${Math.min(next+1,total)} of ${total}</small></div></div><div class="nav-progress"><i id="navProgress"></i></div>`;
     const nearest=this.nearestRouteIndex(this.currentLocation);
     if(nearest>=0 && this.navigationRoute.geometry.coordinates.length>1){$("#navProgress").style.width=(nearest/(this.navigationRoute.geometry.coordinates.length-1)*100)+"%";}
   },
@@ -558,7 +567,7 @@ async init() {
       }
       this.lastRerouteAt=Date.now();this.navigationRoute=route;this.navigationSteps=route.steps||route.legs?.[0]?.steps||[];this.navigationStepIndex=0;
       if(this.routeLine)this.routeLine.remove();this.routeLine=L.geoJSON(route.geometry,{weight:7,color:'#2563eb'}).addTo(this.map);this.map.fitBounds(this.routeLine.getBounds(),{padding:[30,30]});this.startWatchingLocation();this.updateNavigationInstruction();
-      if(!this.navigationSteps.length)$("#routePanel").innerHTML=`<b>${source} to ${this.escape(p.name)}</b><span>${(route.distance/1000).toFixed(2)} km · approx ${Math.ceil(route.duration/60)} min</span>`;
+      if(!this.navigationSteps.length)$("#routePanel").innerHTML=`<b>${source} to ${this.escape(p.name)}</b><span>Route ready</span>`;
       else {const badge=document.createElement('small');badge.textContent=source;badge.style.cssText='display:block;margin-top:6px;color:#93c5fd;font-weight:700';$("#routePanel").appendChild(badge);}
     }catch(e){$("#routePanel").innerHTML=`<b>Navigation</b><span>Could not calculate a route. You can still use the map marker at ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}.</span>`;}
   },
