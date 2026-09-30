@@ -28,6 +28,7 @@ const app = {
   markers: {},
   userMarker: null,
   routeLine: null,
+  campusRouteLayer: null,
   deferredInstall: null,
   currentLocation: null,
   navigationWatchId: null,
@@ -39,12 +40,16 @@ const app = {
   lastHeading: 0,
   lastRerouteAt: 0,
   adminToken: sessionStorage.getItem("admin_token") || "",
+  campusRoutes: [],
+  routeEditMap: null,
+  routeEditLayer: null,
 
   currentPlacesCategory: "All",
 async init() {
     const cached = JSON.parse(localStorage.getItem("campus_places") || "null");
     this.places = cached || DEFAULT_PLACES;
     await this.loadPlacesFromServer();
+    await this.loadRoutesFromServer();
     document.title = CAMPUS_CONFIG.name + " | Campus Navigator";
     $("#brandName").textContent = CAMPUS_CONFIG.shortName;
     this.renderPopular();
@@ -87,6 +92,32 @@ async init() {
       }
     }catch(e){ /* Keep cached/default data when the server is unavailable. */ }
   },
+  async loadRoutesFromServer(){
+    try{
+      const res=await fetch("/api/campus-routes",{cache:"no-store"});
+      if(!res.ok) throw new Error("route load failed");
+      const data=await res.json();
+      if(Array.isArray(data.routes)){
+        this.campusRoutes=data.routes;
+        localStorage.setItem("campus_routes",JSON.stringify(this.campusRoutes));
+        if(this.map)this.renderCampusRoutes();
+      }
+    }catch(e){
+      try{ this.campusRoutes=JSON.parse(localStorage.getItem("campus_routes")||"[]"); }catch{ this.campusRoutes=[]; }
+    }
+  },
+  async saveRoutes(){
+    localStorage.setItem("campus_routes",JSON.stringify(this.campusRoutes));
+    if(this.map)this.renderCampusRoutes();
+    if(!this.adminToken){this.toast("Routes saved on this device. Log in as admin to sync.");return false;}
+    try{
+      const res=await fetch("/api/campus-routes",{method:"PUT",headers:{"Content-Type":"application/json","x-admin-token":this.adminToken},body:JSON.stringify({routes:this.campusRoutes})});
+      if(res.status===401){sessionStorage.removeItem("admin_token");this.adminToken="";this.toast("Admin session expired. Please log in again.");return false;}
+      if(!res.ok) throw new Error("route save failed");
+      return true;
+    }catch(e){this.toast("Routes saved locally, but server sync failed.");return false;}
+  },
+
   async save(){
     localStorage.setItem("campus_places",JSON.stringify(this.places));
     if(!this.adminToken){ this.toast("Saved on this device. Log in as admin to sync across devices."); return false; }
@@ -145,7 +176,18 @@ async init() {
     });
     this.mapStyle = "satellite";
     this.renderMarkers();
+    this.renderCampusRoutes();
     this.render3DMarkers();
+  },
+
+  renderCampusRoutes(){
+    if(!this.map)return;
+    if(this.campusRouteLayer)this.campusRouteLayer.remove();
+    this.campusRouteLayer=L.layerGroup().addTo(this.map);
+    this.campusRoutes.forEach(r=>{
+      if(!Array.isArray(r.points)||r.points.length<2)return;
+      L.polyline(r.points,{color:r.type==='restricted'?'#ef4444':r.type==='vehicle'?'#f59e0b':'#2563eb',weight:4,opacity:.55,dashArray:r.type==='restricted'?'8 8':null}).bindTooltip(this.escape(r.name||'Campus path')).addTo(this.campusRouteLayer);
+    });
   },
 
   render3DMarkers() {
@@ -481,29 +523,44 @@ async init() {
     this.toast(`Reached ${name}`);
   },
 
+  distanceMeters(a,b){
+    const R=6371000,toRad=x=>x*Math.PI/180;const dLat=toRad(b[0]-a[0]),dLng=toRad(b[1]-a[1]);const x=Math.sin(dLat/2)**2+Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLng/2)**2;return 2*R*Math.asin(Math.sqrt(x));
+  },
+  buildCampusGraph(){
+    const active=this.campusRoutes.filter(r=>r.type!=='restricted'&&(r.points||[]).length>1);const nodes=[];const pointNode=[];
+    const findOrCreate=p=>{let best=-1,bd=Infinity;nodes.forEach((n,i)=>{const d=this.distanceMeters(n,p);if(d<12&&d<bd){bd=d;best=i;}});if(best<0){best=nodes.length;nodes.push([p[0],p[1]]);}return best;};
+    const edges=new Map();const addEdge=(a,b)=>{if(a===b)return;const d=this.distanceMeters(nodes[a],nodes[b]);if(!edges.has(a))edges.set(a,[]);if(!edges.has(b))edges.set(b,[]);if(!edges.get(a).some(e=>e.to===b))edges.get(a).push({to:b,w:d});if(!edges.get(b).some(e=>e.to===a))edges.get(b).push({to:a,w:d});};
+    active.forEach(r=>{const ids=r.points.map(findOrCreate);for(let i=1;i<ids.length;i++)addEdge(ids[i-1],ids[i]);pointNode.push(ids);});
+    return {nodes,edges};
+  },
+  nearestGraphNode(nodes,loc){let best=-1,bd=Infinity;nodes.forEach((n,i)=>{const d=this.distanceMeters(loc,n);if(d<bd){bd=d;best=i;}});return {index:best,distance:bd};},
+  shortestGraphPath(graph,start,end){
+    const n=graph.nodes.length;if(start<0||end<0)return null;const dist=Array(n).fill(Infinity),prev=Array(n).fill(-1),used=Array(n).fill(false);dist[start]=0;
+    for(let k=0;k<n;k++){let u=-1,bd=Infinity;for(let i=0;i<n;i++)if(!used[i]&&dist[i]<bd){bd=dist[i];u=i;}if(u<0)break;used[u]=true;if(u===end)break;for(const e of (graph.edges.get(u)||[])){const nd=dist[u]+e.w;if(nd<dist[e.to]){dist[e.to]=nd;prev[e.to]=u;}}}
+    if(!Number.isFinite(dist[end]))return null;const ids=[];for(let u=end;u!==-1;u=prev[u])ids.push(u);ids.reverse();return {indices:ids,distance:dist[end]};
+  },
+  makeCampusSteps(coords){
+    const steps=[];if(coords.length<2)return steps;steps.push({maneuver:{type:'depart',modifier:'straight',location:coords[0]},distance:0});
+    for(let i=1;i<coords.length-1;i++){const a=coords[i-1],b=coords[i],c=coords[i+1];const b1=this.bearingBetween(a[0],a[1],b[0],b[1]),b2=this.bearingBetween(b[0],b[1],c[0],c[1]);let d=((b2-b1+540)%360)-180;let mod=Math.abs(d)<20?'straight':d>0?'right':'left';steps.push({maneuver:{type:mod==='straight'?'continue':'turn',modifier:mod,location:b}});}steps.push({maneuver:{type:'arrive',modifier:'straight',location:coords[coords.length-1]}});return steps;
+  },
+  async buildCampusRoute(p){
+    if(!this.campusRoutes.length)return null;const graph=this.buildCampusGraph();if(!graph.nodes.length)return null;const s=this.nearestGraphNode(graph.nodes,this.currentLocation),e=this.nearestGraphNode(graph.nodes,[p.lat,p.lng]);
+    if(s.distance>180||e.distance>180)return null;const path=this.shortestGraphPath(graph,s.index,e.index);if(!path)return null;
+    const coords=[this.currentLocation,...path.indices.map(i=>graph.nodes[i]),[p.lat,p.lng]];const route={geometry:{type:'LineString',coordinates:coords.map(c=>[c[1],c[0]])},distance:path.distance+s.distance+e.distance,duration:(path.distance+s.distance+e.distance)/1.25};route.steps=this.makeCampusSteps(coords);return route;
+  },
   async buildRoute(p,live=false) {
-    const [lat,lng]=this.currentLocation;
-    $("#routePanel").hidden=false; $("#routePanel").classList.remove('nav-arrived'); $("#routePanel").innerHTML="Calculating route and directions...";
+    const [lat,lng]=this.currentLocation;$("#routePanel").hidden=false;$("#routePanel").classList.remove('nav-arrived');$("#routePanel").innerHTML="Finding the best campus route…";
     try{
-      const url=`https://router.project-osrm.org/route/v1/driving/${lng},${lat};${p.lng},${p.lat}?overview=full&steps=true&geometries=geojson`;
-      const r=await fetch(url); const data=await r.json();
-      if(!data.routes?.length)throw new Error();
-      const route=data.routes[0];
-      this.lastRerouteAt=Date.now();
-      this.navigationRoute=route;
-      this.navigationSteps=route.legs?.[0]?.steps||[];
-      this.navigationStepIndex=0;
-      if(this.routeLine)this.routeLine.remove();
-      this.routeLine=L.geoJSON(route.geometry,{weight:6}).addTo(this.map);
-      this.map.fitBounds(this.routeLine.getBounds(),{padding:[30,30]});
-      this.startWatchingLocation();
-      this.updateNavigationInstruction();
-      if(!this.navigationSteps.length){
-        $("#routePanel").innerHTML=`<b>Route to ${this.escape(p.name)}</b><span>${(route.distance/1000).toFixed(2)} km · approx ${Math.ceil(route.duration/60)} min</span>`;
+      let route=await this.buildCampusRoute(p);let source='Campus route';
+      if(!route){
+        source='Online road route';
+        const url=`https://router.project-osrm.org/route/v1/driving/${lng},${lat};${p.lng},${p.lat}?overview=full&steps=true&geometries=geojson`;const r=await fetch(url);const data=await r.json();if(!data.routes?.length)throw new Error();route=data.routes[0];
       }
-    }catch(e){
-      $("#routePanel").innerHTML=`<b>Navigation</b><span>Online routing is temporarily unavailable. Destination: ${this.escape(p.name)} (${p.lat.toFixed(5)}, ${p.lng.toFixed(5)})</span>`;
-    }
+      this.lastRerouteAt=Date.now();this.navigationRoute=route;this.navigationSteps=route.steps||route.legs?.[0]?.steps||[];this.navigationStepIndex=0;
+      if(this.routeLine)this.routeLine.remove();this.routeLine=L.geoJSON(route.geometry,{weight:7,color:'#2563eb'}).addTo(this.map);this.map.fitBounds(this.routeLine.getBounds(),{padding:[30,30]});this.startWatchingLocation();this.updateNavigationInstruction();
+      if(!this.navigationSteps.length)$("#routePanel").innerHTML=`<b>${source} to ${this.escape(p.name)}</b><span>${(route.distance/1000).toFixed(2)} km · approx ${Math.ceil(route.duration/60)} min</span>`;
+      else {const badge=document.createElement('small');badge.textContent=source;badge.style.cssText='display:block;margin-top:6px;color:#93c5fd;font-weight:700';$("#routePanel").appendChild(badge);}
+    }catch(e){$("#routePanel").innerHTML=`<b>Navigation</b><span>Could not calculate a route. You can still use the map marker at ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}.</span>`;}
   },
 
   isFavorite(id){return JSON.parse(localStorage.getItem("campus_favorites")||"[]").includes(id);},
@@ -591,10 +648,43 @@ async init() {
   },
   renderAdmin(){
     $("#adminContent").innerHTML=`
-      <div class="stats"><div><b>${this.places.length}</b><span>Locations</span></div><div><b>${new Set(this.places.map(p=>p.category)).size}</b><span>Categories</span></div><div><b>${JSON.parse(localStorage.getItem("campus_favorites")||"[]").length}</b><span>Saved</span></div></div>
-      <div class="admin-actions"><button class="primary-btn" onclick="app.newPlace()">＋ Add location</button><button class="secondary-btn" onclick="app.exportData()">Export JSON</button><label class="secondary-btn file-label">Import JSON<input type="file" accept=".json" onchange="app.importData(event)" hidden></label><button class="danger-btn" onclick="app.resetData()">Reset demo data</button></div>
+      <div class="stats"><div><b>${this.places.length}</b><span>Locations</span></div><div><b>${this.campusRoutes.length}</b><span>Campus paths</span></div><div><b>${JSON.parse(localStorage.getItem("campus_favorites")||"[]").length}</b><span>Saved</span></div></div>
+      <div class="admin-actions"><button class="primary-btn" onclick="app.newPlace()">＋ Add location</button><button class="primary-btn" onclick="app.openRouteManager()">🛣️ Campus Routes</button><button class="secondary-btn" onclick="app.exportData()">Export JSON</button><label class="secondary-btn file-label">Import JSON<input type="file" accept=".json" onchange="app.importData(event)" hidden></label><button class="danger-btn" onclick="app.resetData()">Reset demo data</button></div>
       <div class="admin-list">${this.places.map(p=>`<div class="admin-row"><div><b>${this.escape(p.name)}</b><small>${this.escape(p.category)} · ${this.escape(p.building)}</small></div><button onclick="app.editPlace('${p.id}')">Edit</button><button class="danger-text" onclick="app.deletePlace('${p.id}')">Delete</button></div>`).join("")}</div>`;
   },
+  openRouteManager(){
+    const modal=document.createElement("div");modal.className="modal";
+    modal.innerHTML=`<div class="modal-card route-manager-card"><div class="modal-head"><div><h3>🛣️ Campus Route Manager</h3><p class="muted" style="margin:4px 0 0">Draw the real roads and walking paths inside RYMEC. Click along the path, then save it.</p></div><button type="button" data-close>×</button></div>
+      <div class="route-manager-toolbar"><select id="routeType"><option value="walking">🚶 Walking path</option><option value="vehicle">🚗 Vehicle road</option><option value="restricted">🚫 Restricted path</option></select><input id="routeName" placeholder="Path name e.g. Main Gate → CSE Block"><button type="button" class="secondary-btn" data-undo>Undo</button><button type="button" class="primary-btn" data-finish>Finish path</button></div>
+      <div id="routeManagerMap" class="route-manager-map"></div><div class="route-manager-status" data-status>Click <b>Start drawing</b> on the map by placing the first point.</div>
+      <div class="route-list">${this.campusRoutes.length?this.campusRoutes.map(r=>`<div class="route-row"><div><b>${this.escape(r.name||"Unnamed path")}</b><small>${r.type||"walking"} · ${(r.points||[]).length} points</small></div><button class="danger-text" data-delete-route="${this.escapeAttr(r.id)}">Delete</button></div>`).join(""):"<div class='empty' style='padding:25px'>No campus paths yet. Draw your first path above.</div>"}</div>
+      <p class="coordinate-help">Tip: Draw continuously along the center of the actual road/path. Add points at every turn and junction. Restricted paths are shown but excluded from normal navigation.</p></div>`;
+    document.body.appendChild(modal);
+    const map=L.map("routeManagerMap",{zoomControl:true}).setView(CAMPUS_CONFIG.center,18);
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:20,attribution:'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'}).addTo(map);
+    const existing=L.layerGroup().addTo(map);
+    this.campusRoutes.forEach(r=>{if((r.points||[]).length>1)L.polyline(r.points,{color:r.type==='restricted'?'#ef4444':r.type==='vehicle'?'#f59e0b':'#2563eb',weight:5,opacity:.8,dashArray:r.type==='restricted'?'8 8':null}).addTo(existing);});
+    if(this.campusRoutes.some(r=>(r.points||[]).length)){
+      const all=this.campusRoutes.flatMap(r=>r.points||[]); if(all.length>1) map.fitBounds(L.latLngBounds(all),{padding:[25,25]});
+    }
+    let points=[],line=null,markers=L.layerGroup().addTo(map),drawing=false;
+    const status=modal.querySelector("[data-status]");
+    const redraw=()=>{if(line)line.remove();line=points.length?L.polyline(points,{color:'#22c55e',weight:6}).addTo(map):null;markers.clearLayers();points.forEach((p,i)=>L.circleMarker(p,{radius:i===0?7:5,color:'#22c55e',fillOpacity:1}).addTo(markers));status.innerHTML=points.length?`Drawing <b>${points.length} points</b>. Click the road to continue, then press <b>Finish path</b>.`:'Click the map to place the first point.';};
+    map.on("click",e=>{points.push([e.latlng.lat,e.latlng.lng]);drawing=true;redraw();});
+    modal.querySelector("[data-undo]").addEventListener("click",()=>{if(points.length){points.pop();redraw();}});
+    modal.querySelector("[data-finish]").addEventListener("click",async()=>{
+      const name=modal.querySelector("#routeName").value.trim()||`Campus path ${this.campusRoutes.length+1}`;
+      const type=modal.querySelector("#routeType").value;
+      if(points.length<2){this.toast("Place at least two points on the road.");return;}
+      const ok=await this.saveRoute({id:"r"+Date.now(),name,type,points:points.map(p=>[+p[0].toFixed(7),+p[1].toFixed(7)])});
+      if(ok){points=[];line?.remove();markers.clearLayers();modal.remove();map.remove();this.toast("Campus path saved and synced.");this.renderAdmin();this.openRouteManager();}
+    });
+    modal.querySelectorAll("[data-delete-route]").forEach(btn=>btn.addEventListener("click",async()=>{const id=btn.dataset.deleteRoute;if(!confirm("Delete this campus path?"))return;this.campusRoutes=this.campusRoutes.filter(r=>r.id!==id);if(await this.saveRoutes()){modal.remove();map.remove();this.renderAdmin();this.openRouteManager();}}));
+    modal.querySelector("[data-close]").addEventListener("click",()=>{map.remove();modal.remove();});
+    setTimeout(()=>map.invalidateSize(),80);
+  },
+  async saveRoute(route){this.campusRoutes.push(route);const ok=await this.saveRoutes();if(!ok){this.campusRoutes=this.campusRoutes.filter(r=>r.id!==route.id);return false;}return true;},
+
   newPlace(){this.editPlace(null);},
   editPlace(id){
     const p=id?this.places.find(x=>x.id===id):{id:"p"+Date.now(),name:"",category:"Classroom",description:"",building:"",floor:"",room:"",lat:CAMPUS_CONFIG.center[0],lng:CAMPUS_CONFIG.center[1]};
@@ -662,7 +752,7 @@ async init() {
     p.lat=parseFloat($("#f_lat").value);p.lng=parseFloat($("#f_lng").value);
     if(!p.name||!Number.isFinite(p.lat)||!Number.isFinite(p.lng)){this.toast("Name and valid coordinates are required.");return;}
     const i=this.places.findIndex(x=>x.id===id); if(i>=0)this.places[i]=p;else this.places.push(p);
-    await this.save();modal.remove();this.renderAdmin();this.renderMarkers();this.render3DMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();this.toast("Location saved.");
+    const synced=await this.save();if(!synced){this.toast("Location was not synced. Check admin login and Vercel storage, then save again.");return;}modal.remove();this.renderAdmin();this.renderMarkers();this.render3DMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();this.toast("Location saved and synced.");
   },
   async deletePlace(id){if(confirm("Delete this location?")){this.places=this.places.filter(p=>p.id!==id);await this.save();this.renderAdmin();this.renderMarkers();this.render3DMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();}},
   async resetData(){if(confirm("Reset all locations to demo data?")){this.places=[...DEFAULT_PLACES];await this.save();location.reload();}},
