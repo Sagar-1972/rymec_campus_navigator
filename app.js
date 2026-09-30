@@ -38,10 +38,13 @@ const app = {
   userAccuracyCircle: null,
   lastHeading: 0,
   lastRerouteAt: 0,
+  adminToken: sessionStorage.getItem("admin_token") || "",
 
   currentPlacesCategory: "All",
-init() {
-    this.places = JSON.parse(localStorage.getItem("campus_places") || "null") || DEFAULT_PLACES;
+async init() {
+    const cached = JSON.parse(localStorage.getItem("campus_places") || "null");
+    this.places = cached || DEFAULT_PLACES;
+    await this.loadPlacesFromServer();
     document.title = CAMPUS_CONFIG.name + " | Campus Navigator";
     $("#brandName").textContent = CAMPUS_CONFIG.shortName;
     this.renderPopular();
@@ -73,7 +76,27 @@ init() {
     });
   },
 
-  save() { localStorage.setItem("campus_places", JSON.stringify(this.places)); },
+  async loadPlacesFromServer(){
+    try{
+      const res=await fetch("/api/campus-locations",{cache:"no-store"});
+      if(!res.ok) throw new Error("load failed");
+      const data=await res.json();
+      if(Array.isArray(data.places)){
+        this.places=data.places;
+        localStorage.setItem("campus_places",JSON.stringify(this.places));
+      }
+    }catch(e){ /* Keep cached/default data when the server is unavailable. */ }
+  },
+  async save(){
+    localStorage.setItem("campus_places",JSON.stringify(this.places));
+    if(!this.adminToken){ this.toast("Saved on this device. Log in as admin to sync across devices."); return false; }
+    try{
+      const res=await fetch("/api/campus-locations",{method:"PUT",headers:{"Content-Type":"application/json","x-admin-token":this.adminToken},body:JSON.stringify({places:this.places})});
+      if(res.status===401){sessionStorage.removeItem("admin_token");this.adminToken="";this.toast("Admin session expired. Please log in again to sync.");return false;}
+      if(!res.ok) throw new Error("save failed");
+      return true;
+    }catch(e){this.toast("Saved locally, but server sync failed.");return false;}
+  },
 
   show(id, options = {}) {
     const current = this.currentPage || "home";
@@ -551,6 +574,8 @@ init() {
       const data=await res.json();
       if(!data.ok){this.toast("Incorrect username or password.");return;}
       sessionStorage.setItem("admin_session","1");
+      if(data.token){sessionStorage.setItem("admin_token",data.token);this.adminToken=data.token;}
+      await this.loadPlacesFromServer();
       this.closeAdmin();this.renderAdmin();this.show("admin");
     }catch(e){this.toast("Admin login is temporarily unavailable.");}
   },
@@ -632,15 +657,15 @@ init() {
     picker.querySelector("[data-close]").addEventListener("click",()=>{map.remove();picker.remove();});
     setTimeout(()=>map.invalidateSize(),80);
   },
-  savePlace(id,modal){
+  async savePlace(id,modal){
     const p={id};["name","category","description","building","floor","room"].forEach(k=>p[k]=$("#f_"+k).value.trim());
     p.lat=parseFloat($("#f_lat").value);p.lng=parseFloat($("#f_lng").value);
     if(!p.name||!Number.isFinite(p.lat)||!Number.isFinite(p.lng)){this.toast("Name and valid coordinates are required.");return;}
     const i=this.places.findIndex(x=>x.id===id); if(i>=0)this.places[i]=p;else this.places.push(p);
-    this.save();modal.remove();this.renderAdmin();this.renderMarkers();this.render3DMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();this.toast("Location saved.");
+    await this.save();modal.remove();this.renderAdmin();this.renderMarkers();this.render3DMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();this.toast("Location saved.");
   },
-  deletePlace(id){if(confirm("Delete this location?")){this.places=this.places.filter(p=>p.id!==id);this.save();this.renderAdmin();this.renderMarkers();this.render3DMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();}},
-  resetData(){if(confirm("Reset all locations to demo data?")){this.places=DEFAULT_PLACES;this.save();location.reload();}},
+  async deletePlace(id){if(confirm("Delete this location?")){this.places=this.places.filter(p=>p.id!==id);await this.save();this.renderAdmin();this.renderMarkers();this.render3DMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();}},
+  async resetData(){if(confirm("Reset all locations to demo data?")){this.places=[...DEFAULT_PLACES];await this.save();location.reload();}},
   exportData(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(this.places,null,2)],{type:"application/json"}));a.download="campus-locations.json";a.click();},
   importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d))throw 0;this.places=d;this.save();this.renderAdmin();this.renderMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();this.toast("Locations imported.");}catch{this.toast("Invalid JSON file.");}};r.readAsText(f);},
   install(){if(this.deferredInstall){this.deferredInstall.prompt();this.deferredInstall=null;}},

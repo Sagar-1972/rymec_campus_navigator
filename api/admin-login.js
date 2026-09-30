@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+
 export default function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -20,5 +22,7 @@ export default function handler(req, res) {
     return res.status(401).json({ ok: false });
   }
 
-  return res.status(200).json({ ok: true });
+  const ts = Date.now();
+  const token = `${ts}.${crypto.createHmac('sha256', configuredPassword).update(String(ts)).digest('hex')}`;
+  return res.status(200).json({ ok: true, token });
 }

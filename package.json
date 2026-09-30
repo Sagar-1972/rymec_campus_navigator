@@ -22,6 +22,7 @@
   "author": "Sagar-1972",
   "license": "MIT",
   "dependencies": {
-    "@vercel/speed-insights": "^2.0.0"
+    "@vercel/speed-insights": "^2.0.0",
+    "@vercel/blob": "^2.0.0"
   }
 }
