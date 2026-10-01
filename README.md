@@ -29,3 +29,7 @@ This build keeps the existing Campus Navigator UI and exact-location tools, and 
 ## Important
 
 Do not store the admin password in source code. Keep `ADMIN_PASSWORD` in Vercel Environment Variables.
+
+
+## Indoor floor guides
+The app now includes indoor floor-plan references derived from the supplied RYMEC building PDFs. Location details whose `building` matches a supported guide show an **Indoor Guide** button, and the navigation-ready/arrival panel also provides the floor guide. This stage is a visual floor-plan guide; it does not claim live indoor GPS positioning.

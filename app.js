@@ -7,6 +7,80 @@ window.CAMPUS_CONFIG = {
   zoom: 17
 };
 
+
+const BUILDING_GUIDES = {
+  "Main Block": {
+    title:"Main Block RYMEC",
+    source:"01 RymecBlock.pdf",
+    image:"media/plans/main-block.png",
+    floors:["Ground Floor","1st Floor","2nd Floor"],
+    note:"Floor-plan reference from the supplied RYMEC Block drawing. Use the selected floor to orient yourself inside the building."
+  },
+  "CSE Block": {
+    title:"CS & IS Block",
+    source:"02 CS & IS BLOCK.pdf",
+    image:"media/plans/cs-is-block.png",
+    floors:["1st Floor","2nd Floor"],
+    note:"The supplied drawing contains first- and second-floor layouts, including rooms, labs, stairs and the entrance area."
+  },
+  "CS & IS Block": {
+    title:"CS & IS Block",
+    source:"02 CS & IS BLOCK.pdf",
+    image:"media/plans/cs-is-block.png",
+    floors:["1st Floor","2nd Floor"],
+    note:"The supplied drawing contains first- and second-floor layouts, including rooms, labs, stairs and the entrance area."
+  },
+  "Library Block": {
+    title:"Central Library & PG Block",
+    source:"06 LIBRARY AND PG BLOCK.pdf",
+    image:"media/plans/library-pg-block.png",
+    floors:["Existing Ground Floor","1st Floor","2nd Floor"],
+    note:"The supplied plan shows the existing ground floor plus first- and second-floor layouts."
+  },
+  "Civil Engineering Block": {
+    title:"Civil Engineering Block",
+    source:"07 CIVIL ENG BLOCK.pdf",
+    image:"media/plans/civil-block.png",
+    floors:["1st Floor"],
+    note:"Floor-plan reference from the supplied Civil Engineering Block drawing."
+  },
+  "Electrical Block": {
+    title:"Electrical Department",
+    source:"08 ELECTRICALBLOCK.pdf",
+    image:"media/plans/electrical-block.png",
+    floors:["Ground Floor","1st Floor"],
+    note:"The supplied Electrical Department plan shows the entrance/stair area, ground-floor rooms and first-floor classrooms."
+  },
+  "Mechanical Block": {
+    title:"Mechanical Engineering Block",
+    source:"09 MECH RYMEC .dwg New.pdf",
+    image:"media/plans/mechanical-block.png",
+    floors:["Existing Block / Ground Floor","Upper Floor Plan"],
+    note:"Floor-plan reference from the supplied Mechanical Engineering Block drawing."
+  },
+  "Canteen": {
+    title:"Canteen",
+    source:"14 Canteen.pdf",
+    image:"media/plans/canteen.png",
+    floors:["Ground Floor","Upper Floor Plan"],
+    note:"Building plan and elevation from the supplied Canteen drawing."
+  },
+  "Girls Waiting Hall": {
+    title:"Girls Waiting Hall",
+    source:"13 GIRLS WAITING HALL.pdf",
+    image:"media/plans/girls-waiting-hall.png",
+    floors:["1st Floor"],
+    note:"Floor plan, elevation and section from the supplied Girls Waiting Hall drawing."
+  },
+  "Generator Room": {
+    title:"Generator / Power House",
+    source:"05 GENERATOR ROOM DWG.pdf",
+    image:"media/plans/generator-room.png",
+    floors:["Existing Power House"],
+    note:"Existing power-house plan, elevation and section from the supplied drawing."
+  }
+};
+
 const DEFAULT_PLACES = [
   {id:"main",name:"Main Block",category:"Building",description:"Main academic and administrative block.",building:"Main Block",floor:"Ground Floor",room:"",lat:15.13955,lng:76.92135},
   {id:"cse101",name:"CSE Computer Laboratory",category:"Laboratory",description:"Computer Science and Engineering laboratory.",building:"CSE Block",floor:"1st Floor",room:"CSE-101",lat:15.13975,lng:76.92110},
@@ -305,6 +379,31 @@ async init() {
     </article>`;
   },
 
+  buildingGuideFor(p){
+    if(!p) return null;
+    return BUILDING_GUIDES[p.building] || BUILDING_GUIDES[p.building?.replace(/^(Main )?CSE$/i,"CSE Block")] || null;
+  },
+
+  openIndoorGuide(building, floor){
+    const guide=BUILDING_GUIDES[building];
+    if(!guide){this.toast("No floor plan has been attached for this building yet.");return;}
+    const selected=floor || guide.floors[0];
+    const modal=document.createElement("div");
+    modal.className="modal";
+    modal.innerHTML=`<div class="modal-card indoor-modal-card">
+      <div class="modal-head"><div><h3>🏢 ${this.escape(guide.title)}</h3><p class="muted" style="margin:4px 0 0">Indoor floor guide — ${this.escape(selected)}</p></div><button type="button" data-close>×</button></div>
+      <div class="floor-chips">${guide.floors.map(f=>`<button type="button" class="floor-chip ${f===selected?"active":""}" data-floor="${this.escapeAttr(f)}">${this.escape(f)}</button>`).join("")}</div>
+      <img class="indoor-plan" src="${guide.image}" alt="${this.escapeAttr(guide.title)} floor plan reference">
+      <p class="muted" style="margin:10px 0 0">${this.escape(guide.note)}</p>
+      <div class="indoor-source">Source drawing: ${this.escape(guide.source)}</div>
+    </div>`;
+    document.body.appendChild(modal);
+    const setFloor=(f)=>{modal.querySelectorAll("[data-floor]").forEach(b=>b.classList.toggle("active",b.dataset.floor===f));modal.querySelector(".indoor-modal-card .muted").textContent=`Indoor floor guide — ${f}`;};
+    modal.querySelectorAll("[data-floor]").forEach(btn=>btn.addEventListener("click",()=>setFloor(btn.dataset.floor)));
+    modal.querySelector("[data-close]").addEventListener("click",()=>modal.remove());
+    modal.addEventListener("click",e=>{if(e.target===modal)modal.remove();});
+  },
+
   showDetails(id) {
     const p = this.places.find(x=>x.id===id); if(!p) return;
     this.detailsReturnPage = this.currentPage && this.currentPage !== "details" ? this.currentPage : "home";
@@ -316,7 +415,8 @@ async init() {
         <div><small>ROOM</small><b>${this.escape(p.room || "—")}</b></div>
         <div><small>COORDINATES</small><b>${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</b></div>
       </div>
-      <div class="detail-actions"><button class="primary-btn" onclick="app.navigateTo('${p.id}')">🧭 Navigate</button><button class="secondary-btn" onclick="app.toggleFavorite('${p.id}');app.showDetails('${p.id}')">${this.isFavorite(p.id)?"♥ Saved":"♡ Save"}</button></div>
+      <div class="detail-actions"><button class="primary-btn" onclick="app.navigateTo('${p.id}')">🧭 Navigate</button>${this.buildingGuideFor(p)?`<button class="secondary-btn" onclick="app.openIndoorGuide('${this.escapeAttr(p.building)}','${this.escapeAttr(p.floor)}')">🏢 Indoor Guide</button>`:""}<button class="secondary-btn" onclick="app.toggleFavorite('${p.id}');app.showDetails('${p.id}')">${this.isFavorite(p.id)?"♥ Saved":"♡ Save"}</button></div>
+      ${this.buildingGuideFor(p)?`<div class="indoor-guide"><h3>Indoor navigation available</h3><p>${this.escape(this.buildingGuideFor(p).title)} · ${this.escape(p.floor || "Floor not specified")}</p><button class="secondary-btn" style="margin-top:10px" onclick="app.openIndoorGuide('${this.escapeAttr(p.building)}','${this.escapeAttr(p.floor)}')">View floor plan</button></div>`:""}
       ${p.id==='main'?`<div class="media-gallery"><h3>Actual Main Block Views</h3><div class="gallery-grid">
         <figure><img src="media/main-block-front.jpg" alt="RYMEC Main Block front view"><figcaption>Front approach captured from the uploaded campus video.</figcaption></figure>
         <figure><img src="media/main-block-close.jpg" alt="RYMEC Main Block entrance close view" loading="lazy" decoding="async"><figcaption>Closer view of the Main Block entrance.</figcaption></figure>
@@ -346,7 +446,7 @@ async init() {
   installNavigationStyles(){
     if(document.getElementById('nav-live-style'))return;
     const style=document.createElement('style');style.id='nav-live-style';
-    style.textContent='.nav-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}.nav-actions .primary-btn,.nav-actions .secondary-btn{padding:9px 12px;font-size:12px}.nav-stop-btn{color:#b91c1c;border-color:#fecaca;background:#fff}.map-3d-note{pointer-events:none}';
+    style.textContent='.nav-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}.nav-actions .primary-btn,.nav-actions .secondary-btn{padding:9px 12px;font-size:12px}.nav-stop-btn{color:#b91c1c;border-color:#fecaca;background:#fff}.map-3d-note{pointer-events:none}.indoor-guide{margin:16px 0;background:#fff;border:1px solid #dbeafe;border-radius:16px;padding:15px}.indoor-guide h3{margin:0 0 5px;font-size:16px}.indoor-guide p{margin:0;color:#64748b;font-size:12px;line-height:1.5}.floor-chips{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}.floor-chip{border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:999px;padding:8px 11px;font-size:11px;font-weight:800;cursor:pointer}.floor-chip.active{background:#0f172a;color:#fff;border-color:#0f172a}.indoor-plan{width:100%;max-height:62vh;object-fit:contain;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin-top:8px}.indoor-source{font-size:10px;color:#94a3b8;margin-top:8px}.indoor-modal-card{width:min(1050px,100%)}';
     document.head.appendChild(style);
   },
 
@@ -409,7 +509,8 @@ async init() {
   showNavigationReady(p){
     $("#routePanel").hidden=false;
     $("#routePanel").classList.remove('nav-arrived');
-    $("#routePanel").innerHTML=`<div class="nav-direction"><div class="nav-turn">🧭</div><div class="nav-copy"><strong>Navigate to ${this.escape(p.name)}</strong><small>Press Start Navigation to use live GPS.</small></div></div><div class="nav-actions"><button type="button" class="primary-btn" onclick="app.startNavigation(app.navigationDestination)">▶ Start Navigation</button><button type="button" class="secondary-btn nav-stop-btn" onclick="app.stopNavigation(true)">⏹ Stop</button></div>`;
+    const guide=this.buildingGuideFor(p);
+    $("#routePanel").innerHTML=`<div class="nav-direction"><div class="nav-turn">🧭</div><div class="nav-copy"><strong>Navigate to ${this.escape(p.name)}</strong><small>${guide?`${this.escape(p.building)} · ${this.escape(p.floor||"Floor not specified")} — outdoor route first, then use the indoor guide.`:"Press Start Navigation to use live GPS."}</small></div></div><div class="nav-actions"><button type="button" class="primary-btn" onclick="app.startNavigation(app.navigationDestination)">▶ Start Navigation</button>${guide?`<button type="button" class="secondary-btn" onclick="app.openIndoorGuide('${this.escapeAttr(p.building)}','${this.escapeAttr(p.floor)}')">🏢 Indoor Guide</button>`:""}<button type="button" class="secondary-btn nav-stop-btn" onclick="app.stopNavigation(true)">⏹ Stop</button></div>`;
   },
 
   stopNavigation(clearPanel=true) {
@@ -571,7 +672,8 @@ async init() {
     this.stopNavigation(false);
     $("#routePanel").hidden=false;
     $("#routePanel").classList.add('nav-arrived');
-    $("#routePanel").innerHTML=`<div class="nav-direction"><div class="nav-turn">✓</div><div class="nav-copy"><strong>🎉 Reached the destination!</strong><small>You have arrived at ${this.escape(name)}.</small></div></div>`;
+    const destination=this.navigationDestination; const guide=this.buildingGuideFor(destination);
+    $("#routePanel").innerHTML=`<div class="nav-direction"><div class="nav-turn">✓</div><div class="nav-copy"><strong>🎉 Reached the destination!</strong><small>You have arrived at ${this.escape(name)}.</small></div></div><div class="nav-actions">${guide?`<button type="button" class="primary-btn" onclick="app.openIndoorGuide('${this.escapeAttr(destination.building)}','${this.escapeAttr(destination.floor)}')">🏢 Open ${this.escape(destination.floor||"Floor")} Guide</button>`:""}<button type="button" class="secondary-btn nav-stop-btn" onclick="app.stopNavigation(true)">⏹ Stop Navigation</button></div>`;
     this.toast(`Reached ${name}`);
   },
 
