@@ -28,6 +28,8 @@ const app = {
   markers: {},
   userMarker: null,
   routeLine: null,
+  routePassedLine: null,
+  navigationStarted: false,
   campusRouteLayer: null,
   deferredInstall: null,
   currentLocation: null,
@@ -58,6 +60,7 @@ async init() {
     this.renderCategories();
     this.renderFavorites();
     this.initMap();
+    this.installNavigationStyles();
     this.registerPWA();
     this.initAnalyticsConsent();
     window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); this.deferredInstall = e; $("#installBtn").hidden = false; });
@@ -144,8 +147,9 @@ async init() {
     if (id === "map" && this.map) {
       // Opening Campus Map itself should show the 3D campus overview, not a previous navigation session.
       this.stopNavigation(true);
-      if (this.routeLine) { this.routeLine.remove(); this.routeLine = null; }
+      this.clearNavigationLayers();
       this.navigationDestination = null;
+      this.navigationStarted = false;
       this.setMapStyle("3d");
       this.render3DMarkers();
       setTimeout(() => this.map.invalidateSize(), 150);
@@ -196,7 +200,7 @@ async init() {
     this.campusRouteLayer=L.layerGroup().addTo(this.map);
     this.campusRoutes.forEach(r=>{
       if(!Array.isArray(r.points)||r.points.length<2)return;
-      L.polyline(r.points,{color:r.type==='restricted'?'#ef4444':r.type==='vehicle'?'#f59e0b':'#2563eb',weight:4,opacity:.55,dashArray:r.type==='restricted'?'8 8':null}).bindTooltip(this.escape(r.name||'Campus path')).addTo(this.campusRouteLayer);
+      L.polyline(r.displayPoints?.length>1?r.displayPoints:r.points,{color:r.type==='restricted'?'#ef4444':r.type==='vehicle'?'#f59e0b':'#2563eb',weight:4,opacity:.55,dashArray:r.type==='restricted'?'8 8':null}).bindTooltip(this.escape(r.name||'Campus path')).addTo(this.campusRouteLayer);
     });
   },
 
@@ -216,25 +220,26 @@ async init() {
 
   setMapStyle(style) {
     const map3d = $("#map3dCanvas"), map2d = $("#mapCanvas");
+    const search = $(".map-search"), styleControl = $(".map-style-control"), legend = $(".map-legend");
     if (style === "3d") {
       if (map2d) map2d.style.display = "none";
       if (map3d) map3d.hidden = false;
+      if (search) search.style.display = "none";
+      if (styleControl) styleControl.style.display = "none";
+      if (legend) legend.style.display = "none";
+      const note = $(".map3d-note"); if (note) note.textContent = "🏫 3D campus view — Explore only";
     } else {
       if (map3d) map3d.hidden = true;
       if (map2d) map2d.style.display = "";
+      if (search) search.style.display = "";
+      if (styleControl) styleControl.style.display = "";
+      if (legend) legend.style.display = "";
       if (!this.map || !this.baseLayers) return;
-      ["street","satellite"].forEach(k => {
-        if (this.map.hasLayer(this.baseLayers[k])) this.map.removeLayer(this.baseLayers[k]);
-      });
+      ["street","satellite"].forEach(k => { if (this.map.hasLayer(this.baseLayers[k])) this.map.removeLayer(this.baseLayers[k]); });
       if (this.map.hasLayer(this.hybridOverlay)) this.map.removeLayer(this.hybridOverlay);
-      if (style === "street") {
-        this.baseLayers.street.addTo(this.map);
-      } else if (style === "hybrid") {
-        this.baseLayers.satellite.addTo(this.map);
-        this.hybridOverlay.addTo(this.map);
-      } else {
-        this.baseLayers.satellite.addTo(this.map);
-      }
+      if (style === "street") this.baseLayers.street.addTo(this.map);
+      else if (style === "hybrid") { this.baseLayers.satellite.addTo(this.map); this.hybridOverlay.addTo(this.map); }
+      else this.baseLayers.satellite.addTo(this.map);
       setTimeout(() => this.map.invalidateSize(), 100);
     }
     this.mapStyle = style;
@@ -338,6 +343,13 @@ async init() {
     }
   },
 
+  installNavigationStyles(){
+    if(document.getElementById('nav-live-style'))return;
+    const style=document.createElement('style');style.id='nav-live-style';
+    style.textContent='.nav-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}.nav-actions .primary-btn,.nav-actions .secondary-btn{padding:9px 12px;font-size:12px}.nav-stop-btn{color:#b91c1c;border-color:#fecaca;background:#fff}.map-3d-note{pointer-events:none}';
+    document.head.appendChild(style);
+  },
+
   openCampusMedia(type) {
     const isMain = type === 'main';
     const title = isMain ? 'Main Block — Real Campus View' : 'Campus — Aerial View';
@@ -364,11 +376,14 @@ async init() {
   navigateTo(id) {
     const p=this.places.find(x=>x.id===id); if(!p)return;
     this.show("map");
-    if(this.mapStyle==="3d") this.setMapStyle("satellite");
     this.navigationDestination=p;
+    this.navigationStarted=false;
+    this.stopNavigation(false);
+    this.clearNavigationLayers();
+    this.setMapStyle("satellite");
     this.map.setView([p.lat,p.lng],18);
     this.markers[p.id]?.openPopup();
-    this.startNavigation(p);
+    this.showNavigationReady(p);
   },
 
   locate(callback) {
@@ -386,25 +401,37 @@ async init() {
     this.stopNavigation(false);
     this.navigationDestination=p;
     this.navigationDestination._arrived=false;
+    this.navigationStarted=true;
     this.showNavigationLoading(p);
-    if(this.currentLocation){
-      this.buildRoute(p,true);
-    } else {
-      this.locate(()=>this.buildRoute(p,true));
-    }
+    if(this.currentLocation) this.buildRoute(p,true); else this.locate(()=>this.buildRoute(p,true));
+  },
+
+  showNavigationReady(p){
+    $("#routePanel").hidden=false;
+    $("#routePanel").classList.remove('nav-arrived');
+    $("#routePanel").innerHTML=`<div class="nav-direction"><div class="nav-turn">🧭</div><div class="nav-copy"><strong>Navigate to ${this.escape(p.name)}</strong><small>Press Start Navigation to use live GPS.</small></div></div><div class="nav-actions"><button type="button" class="primary-btn" onclick="app.startNavigation(app.navigationDestination)">▶ Start Navigation</button><button type="button" class="secondary-btn nav-stop-btn" onclick="app.stopNavigation(true)">⏹ Stop</button></div>`;
   },
 
   stopNavigation(clearPanel=true) {
     if(this.navigationWatchId!==null){navigator.geolocation.clearWatch(this.navigationWatchId);this.navigationWatchId=null;}
+    this.navigationStarted=false;
     this.navigationRoute=null;
     this.navigationSteps=[];
     this.navigationStepIndex=0;
-    if(clearPanel)$("#routePanel").hidden=true;
+    this.clearNavigationLayers();
+    if(clearPanel){const panel=$("#routePanel");if(panel){panel.hidden=true;panel.classList.remove('nav-arrived');}}
+    else if(this.navigationDestination) this.showNavigationReady(this.navigationDestination);
+  },
+
+  clearNavigationLayers(){
+    if(this.routeLine){this.routeLine.remove();this.routeLine=null;}
+    if(this.routePassedLine){this.routePassedLine.remove();this.routePassedLine=null;}
   },
 
   showNavigationLoading(p){
     $("#routePanel").hidden=false;
-    $("#routePanel").innerHTML=`<div class="nav-direction"><div class="nav-turn">🧭</div><div class="nav-copy"><strong>Finding route to ${this.escape(p.name)}</strong><small>Getting your live location and directions…</small></div></div>`;
+    $("#routePanel").classList.remove('nav-arrived');
+    $("#routePanel").innerHTML=`<div class="nav-direction"><div class="nav-turn">🧭</div><div class="nav-copy"><strong>Finding route to ${this.escape(p.name)}</strong><small>Getting your live location and campus route…</small></div></div><div class="nav-actions"><button type="button" class="secondary-btn nav-stop-btn" onclick="app.stopNavigation(true)">⏹ Stop</button></div>`;
   },
 
   ensureUserMarker(){
@@ -453,9 +480,25 @@ async init() {
       if(nearest>=0 && total>1){
         const progress=Math.max(0,Math.min(100,(nearest/(total-1))*100));
         const bar=$("#navProgress"); if(bar)bar.style.width=progress+"%";
+        this.updateMovingRouteLine(nearest);
       }
       this.updateNavigationInstruction();
       if(this.map.getBounds().contains(this.currentLocation)===false){this.map.setView(this.currentLocation,Math.max(this.map.getZoom(),18),{animate:true});}
+    }
+  },
+
+  updateMovingRouteLine(nearestIndex){
+    if(!this.navigationRoute?.geometry?.coordinates?.length || !this.map)return;
+    const coords=this.navigationRoute.geometry.coordinates;
+    const start=Math.max(0,Math.min(nearestIndex,coords.length-1));
+    const remaining=[[this.currentLocation[1],this.currentLocation[0]],...coords.slice(start+1)];
+    if(this.routeLine)this.routeLine.setLatLngs(remaining.map(c=>[c[1],c[0]]));
+    else if(remaining.length>1)this.routeLine=L.polyline(remaining.map(c=>[c[1],c[0]]),{weight:7,color:'#2563eb',opacity:.95,lineCap:'round',lineJoin:'round'}).addTo(this.map);
+    const passed=coords.slice(0,start+1).map(c=>[c[1],c[0]]);
+    if(passed.length>1){
+      passed.push([this.currentLocation[0],this.currentLocation[1]]);
+      if(this.routePassedLine)this.routePassedLine.setLatLngs(passed);
+      else this.routePassedLine=L.polyline(passed,{weight:7,color:'#94a3b8',opacity:.55,lineCap:'round',lineJoin:'round'}).addTo(this.map);
     }
   },
 
@@ -516,7 +559,7 @@ async init() {
     const text=this.formatStep(step);
     const total=this.navigationSteps.length;
     $("#routePanel").hidden=false;
-    $("#routePanel").innerHTML=`<div class="nav-direction"><div class="nav-turn">${icon}</div><div class="nav-copy"><strong>${this.escape(text)}</strong><small>Step ${Math.min(next+1,total)} of ${total}</small></div></div><div class="nav-progress"><i id="navProgress"></i></div>`;
+    $("#routePanel").innerHTML=`<div class="nav-direction"><div class="nav-turn">${icon}</div><div class="nav-copy"><strong>${this.escape(text)}</strong><small>Step ${Math.min(next+1,total)} of ${total}</small></div></div><div class="nav-progress"><i id="navProgress"></i></div><div class="nav-actions"><button type="button" class="secondary-btn nav-stop-btn" onclick="app.stopNavigation(true)">⏹ Stop Navigation</button></div>`;
     const nearest=this.nearestRouteIndex(this.currentLocation);
     if(nearest>=0 && this.navigationRoute.geometry.coordinates.length>1){$("#navProgress").style.width=(nearest/(this.navigationRoute.geometry.coordinates.length-1)*100)+"%";}
   },
@@ -566,7 +609,10 @@ async init() {
         const url=`https://router.project-osrm.org/route/v1/driving/${lng},${lat};${p.lng},${p.lat}?overview=full&steps=true&geometries=geojson`;const r=await fetch(url);const data=await r.json();if(!data.routes?.length)throw new Error();route=data.routes[0];
       }
       this.lastRerouteAt=Date.now();this.navigationRoute=route;this.navigationSteps=route.steps||route.legs?.[0]?.steps||[];this.navigationStepIndex=0;
-      if(this.routeLine)this.routeLine.remove();this.routeLine=L.geoJSON(route.geometry,{weight:7,color:'#2563eb'}).addTo(this.map);this.map.fitBounds(this.routeLine.getBounds(),{padding:[30,30]});this.startWatchingLocation();this.updateNavigationInstruction();
+      this.clearNavigationLayers();
+      const initialCoords=route.geometry?.coordinates||[];
+      if(initialCoords.length>1){this.routeLine=L.polyline(initialCoords.map(c=>[c[1],c[0]]),{weight:7,color:'#2563eb',opacity:.95,lineCap:'round',lineJoin:'round'}).addTo(this.map);this.map.fitBounds(this.routeLine.getBounds(),{padding:[30,30]});}
+      this.startWatchingLocation();this.updateNavigationInstruction();this.updateMovingRouteLine(0);
       if(!this.navigationSteps.length)$("#routePanel").innerHTML=`<b>${source} to ${this.escape(p.name)}</b><span>Route ready</span>`;
       else {const badge=document.createElement('small');badge.textContent=source;badge.style.cssText='display:block;margin-top:6px;color:#93c5fd;font-weight:700';$("#routePanel").appendChild(badge);}
     }catch(e){$("#routePanel").innerHTML=`<b>Navigation</b><span>Could not calculate a route. You can still use the map marker at ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}.</span>`;}
@@ -664,7 +710,7 @@ async init() {
   openRouteManager(){
     const modal=document.createElement("div");modal.className="modal";
     modal.innerHTML=`<div class="modal-card route-manager-card"><div class="modal-head"><div><h3>🛣️ Campus Route Manager</h3><p class="muted" style="margin:4px 0 0">Draw the real roads and walking paths inside RYMEC. Click along the path, then save it.</p></div><button type="button" data-close>×</button></div>
-      <div class="route-manager-toolbar"><select id="routeType"><option value="walking">🚶 Walking path</option><option value="vehicle">🚗 Vehicle road</option><option value="restricted">🚫 Restricted path</option></select><input id="routeName" placeholder="Path name e.g. Main Gate → CSE Block"><button type="button" class="secondary-btn" data-undo>Undo</button><button type="button" class="primary-btn" data-finish>Finish path</button></div>
+      <div class="route-manager-toolbar"><select id="routeType"><option value="walking">🚶 Walking path</option><option value="vehicle">🚗 Vehicle road</option><option value="restricted">🚫 Restricted path</option></select><input id="routeName" placeholder="Path name e.g. Main Gate → CSE Block"><button type="button" class="secondary-btn" data-undo>Undo</button><button type="button" class="secondary-btn" data-clear>Clear</button><button type="button" class="primary-btn" data-finish>Finish & Smooth</button></div>
       <div id="routeManagerMap" class="route-manager-map"></div><div class="route-manager-status" data-status>Click <b>Start drawing</b> on the map by placing the first point.</div>
       <div class="route-list">${this.campusRoutes.length?this.campusRoutes.map(r=>`<div class="route-row"><div><b>${this.escape(r.name||"Unnamed path")}</b><small>${r.type||"walking"} · ${(r.points||[]).length} points</small></div><button class="danger-text" data-delete-route="${this.escapeAttr(r.id)}">Delete</button></div>`).join(""):"<div class='empty' style='padding:25px'>No campus paths yet. Draw your first path above.</div>"}</div>
       <p class="coordinate-help">Tip: Draw continuously along the center of the actual road/path. Add points at every turn and junction. Restricted paths are shown but excluded from normal navigation.</p></div>`;
@@ -672,21 +718,30 @@ async init() {
     const map=L.map("routeManagerMap",{zoomControl:true}).setView(CAMPUS_CONFIG.center,18);
     L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:20,attribution:'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'}).addTo(map);
     const existing=L.layerGroup().addTo(map);
-    this.campusRoutes.forEach(r=>{if((r.points||[]).length>1)L.polyline(r.points,{color:r.type==='restricted'?'#ef4444':r.type==='vehicle'?'#f59e0b':'#2563eb',weight:5,opacity:.8,dashArray:r.type==='restricted'?'8 8':null}).addTo(existing);});
+    this.campusRoutes.forEach(r=>{if((r.points||[]).length>1)L.polyline(r.displayPoints?.length>1?r.displayPoints:r.points,{color:r.type==='restricted'?'#ef4444':r.type==='vehicle'?'#f59e0b':'#2563eb',weight:5,opacity:.8,dashArray:r.type==='restricted'?'8 8':null}).addTo(existing);});
     if(this.campusRoutes.some(r=>(r.points||[]).length)){
       const all=this.campusRoutes.flatMap(r=>r.points||[]); if(all.length>1) map.fitBounds(L.latLngBounds(all),{padding:[25,25]});
     }
-    let points=[],line=null,markers=L.layerGroup().addTo(map),drawing=false;
+    let points=[],line=null,markers=L.layerGroup().addTo(map);
     const status=modal.querySelector("[data-status]");
-    const redraw=()=>{if(line)line.remove();line=points.length?L.polyline(points,{color:'#22c55e',weight:6}).addTo(map):null;markers.clearLayers();points.forEach((p,i)=>L.circleMarker(p,{radius:i===0?7:5,color:'#22c55e',fillOpacity:1}).addTo(markers));status.innerHTML=points.length?`Drawing <b>${points.length} points</b>. Click the road to continue, then press <b>Finish path</b>.`:'Click the map to place the first point.';};
-    map.on("click",e=>{points.push([e.latlng.lat,e.latlng.lng]);drawing=true;redraw();});
+    const smoothRoute=(pts)=>{
+      if(pts.length<3)return pts.slice();
+      const out=[pts[0]];
+      for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1];out.push([a[0]*.25+b[0]*.75,a[1]*.25+b[1]*.75]);out.push([a[0]*.5+b[0]*.5,a[1]*.5+b[1]*.5]);if(i===pts.length-2)out.push([a[0]*.25+b[0]*.75,a[1]*.25+b[1]*.75]);}
+      out.push(pts[pts.length-1]); return out;
+    };
+    const redraw=()=>{if(line)line.remove();line=points.length?L.polyline(points,{color:'#22c55e',weight:6,smoothFactor:1.5,lineCap:'round',lineJoin:'round'}).addTo(map):null;markers.clearLayers();points.forEach((p,i)=>L.circleMarker(p,{radius:i===0||i===points.length-1?7:4,color:'#22c55e',fillOpacity:1,weight:2}).addTo(markers));status.innerHTML=points.length?`Drawing <b>${points.length} points</b>. Add points at turns; Finish & Smooth cleans the shape.`:'Click the map to place the first point.';};
+    map.on("click",e=>{const p=[e.latlng.lat,e.latlng.lng],last=points[points.length-1];if(last&&this.distanceMeters(last,p)<4)return;points.push(p);redraw();});
     modal.querySelector("[data-undo]").addEventListener("click",()=>{if(points.length){points.pop();redraw();}});
+    modal.querySelector("[data-clear]").addEventListener("click",()=>{points=[];redraw();});
     modal.querySelector("[data-finish]").addEventListener("click",async()=>{
       const name=modal.querySelector("#routeName").value.trim()||`Campus path ${this.campusRoutes.length+1}`;
       const type=modal.querySelector("#routeType").value;
       if(points.length<2){this.toast("Place at least two points on the road.");return;}
-      const ok=await this.saveRoute({id:"r"+Date.now(),name,type,points:points.map(p=>[+p[0].toFixed(7),+p[1].toFixed(7)])});
-      if(ok){points=[];line?.remove();markers.clearLayers();modal.remove();map.remove();this.toast("Campus path saved and synced.");this.renderAdmin();this.openRouteManager();}
+      const raw=points.map(p=>[+p[0].toFixed(7),+p[1].toFixed(7)]);
+      const smoothed=smoothRoute(raw).map(p=>[+p[0].toFixed(7),+p[1].toFixed(7)]);
+      const ok=await this.saveRoute({id:"r"+Date.now(),name,type,points:raw,displayPoints:smoothed});
+      if(ok){points=[];line?.remove();markers.clearLayers();modal.remove();map.remove();this.toast("Clean campus path saved and synced.");this.renderAdmin();this.openRouteManager();}
     });
     modal.querySelectorAll("[data-delete-route]").forEach(btn=>btn.addEventListener("click",async()=>{const id=btn.dataset.deleteRoute;if(!confirm("Delete this campus path?"))return;this.campusRoutes=this.campusRoutes.filter(r=>r.id!==id);if(await this.saveRoutes()){modal.remove();map.remove();this.renderAdmin();this.openRouteManager();}}));
     modal.querySelector("[data-close]").addEventListener("click",()=>{map.remove();modal.remove();});
