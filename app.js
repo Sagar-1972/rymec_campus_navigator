@@ -11,10 +11,15 @@ window.CAMPUS_CONFIG = {
 const BUILDING_GUIDES = {
   "Main Block": {
     title:"Main Block RYMEC",
-    source:"01 RymecBlock.pdf",
-    image:"media/plans/main-block.png",
-    floors:["Ground Floor","1st Floor","2nd Floor"],
-    note:"Floor-plan reference from the supplied RYMEC Block drawing. Use the selected floor to orient yourself inside the building."
+    source:"User-supplied Main Block floor maps",
+    floors:["1st Floor","2nd Floor","3rd Floor"],
+    maps:{
+      "1st Floor":"media/plans/main-block-1st-floor.jpg",
+      "2nd Floor":"media/plans/main-block-2nd-floor.jpg",
+      "3rd Floor":"media/plans/main-block-3rd-floor.jpg"
+    },
+    image:"media/plans/main-block-1st-floor.jpg",
+    note:"Three separate Main Block floor maps supplied for the 1st, 2nd and 3rd floors."
   },
   "CSE Block": {
     title:"CS & IS Block",
@@ -117,6 +122,7 @@ const app = {
   lastRerouteAt: 0,
   adminToken: sessionStorage.getItem("admin_token") || "",
   campusRoutes: [],
+  indoorMaps: [],
   routeEditMap: null,
   routeEditLayer: null,
 
@@ -126,6 +132,7 @@ async init() {
     this.places = cached || DEFAULT_PLACES;
     await this.loadPlacesFromServer();
     await this.loadRoutesFromServer();
+    await this.loadIndoorMapsFromServer();
     document.title = CAMPUS_CONFIG.name + " | Campus Navigator";
     $("#brandName").textContent = CAMPUS_CONFIG.shortName;
     this.renderPopular();
@@ -181,6 +188,36 @@ async init() {
       }
     }catch(e){
       try{ this.campusRoutes=JSON.parse(localStorage.getItem("campus_routes")||"[]"); }catch{ this.campusRoutes=[]; }
+    }
+  },
+  async loadIndoorMapsFromServer(){
+    try{
+      const res=await fetch("/api/indoor-maps",{cache:"no-store"});
+      if(!res.ok) throw new Error("indoor map load failed");
+      const data=await res.json();
+      if(Array.isArray(data.maps)){
+        this.indoorMaps=data.maps;
+        localStorage.setItem("campus_indoor_maps",JSON.stringify(this.indoorMaps));
+        this.applyIndoorMaps();
+      }
+    }catch(e){
+      try{this.indoorMaps=JSON.parse(localStorage.getItem("campus_indoor_maps")||"[]");}catch{this.indoorMaps=[];}
+      this.applyIndoorMaps();
+    }
+  },
+  applyIndoorMaps(){
+    // Uploaded admin maps override built-in floor maps without requiring code changes.
+    for(const m of this.indoorMaps||[]){
+      if(!m?.building||!m?.floor||!m?.image) continue;
+      const existing=BUILDING_GUIDES[m.building] || {title:m.building,source:"Admin uploaded",floors:[],maps:{},image:m.image,note:"Indoor floor map uploaded by the campus administrator."};
+      existing.title=existing.title||m.building;
+      existing.maps=existing.maps||{};
+      if(!existing.floors.includes(m.floor)) existing.floors.push(m.floor);
+      existing.maps[m.floor]=m.image;
+      existing.image=existing.maps[existing.floors[0]]||m.image;
+      existing.source=m.source||existing.source||"Admin uploaded";
+      existing.note=m.note||existing.note||"Indoor floor map uploaded by the campus administrator.";
+      BUILDING_GUIDES[m.building]=existing;
     }
   },
   async saveRoutes(){
@@ -390,15 +427,22 @@ async init() {
     const selected=floor || guide.floors[0];
     const modal=document.createElement("div");
     modal.className="modal";
+    const imageForFloor = f => (guide.maps && guide.maps[f]) || guide.image;
     modal.innerHTML=`<div class="modal-card indoor-modal-card">
       <div class="modal-head"><div><h3>🏢 ${this.escape(guide.title)}</h3><p class="muted" style="margin:4px 0 0">Indoor floor guide — ${this.escape(selected)}</p></div><button type="button" data-close>×</button></div>
       <div class="floor-chips">${guide.floors.map(f=>`<button type="button" class="floor-chip ${f===selected?"active":""}" data-floor="${this.escapeAttr(f)}">${this.escape(f)}</button>`).join("")}</div>
-      <img class="indoor-plan" src="${guide.image}" alt="${this.escapeAttr(guide.title)} floor plan reference">
+      <img class="indoor-plan" src="${imageForFloor(selected)}" alt="${this.escapeAttr(guide.title)} ${this.escapeAttr(selected)} floor map">
       <p class="muted" style="margin:10px 0 0">${this.escape(guide.note)}</p>
-      <div class="indoor-source">Source drawing: ${this.escape(guide.source)}</div>
+      <div class="indoor-source">Source: ${this.escape(guide.source)}</div>
     </div>`;
     document.body.appendChild(modal);
-    const setFloor=(f)=>{modal.querySelectorAll("[data-floor]").forEach(b=>b.classList.toggle("active",b.dataset.floor===f));modal.querySelector(".indoor-modal-card .muted").textContent=`Indoor floor guide — ${f}`;};
+    const setFloor=(f)=>{
+      modal.querySelectorAll("[data-floor]").forEach(b=>b.classList.toggle("active",b.dataset.floor===f));
+      modal.querySelector(".indoor-modal-card .muted").textContent=`Indoor floor guide — ${f}`;
+      const img=modal.querySelector(".indoor-plan");
+      img.src=imageForFloor(f);
+      img.alt=`${guide.title} ${f} floor map`;
+    };
     modal.querySelectorAll("[data-floor]").forEach(btn=>btn.addEventListener("click",()=>setFloor(btn.dataset.floor)));
     modal.querySelector("[data-close]").addEventListener("click",()=>modal.remove());
     modal.addEventListener("click",e=>{if(e.target===modal)modal.remove();});
@@ -790,6 +834,7 @@ async init() {
       sessionStorage.setItem("admin_session","1");
       if(data.token){sessionStorage.setItem("admin_token",data.token);this.adminToken=data.token;}
       await this.loadPlacesFromServer();
+      await this.loadIndoorMapsFromServer();
       this.closeAdmin();this.renderAdmin();this.show("admin");
     }catch(e){this.toast("Admin login is temporarily unavailable.");}
   },
@@ -806,8 +851,115 @@ async init() {
   renderAdmin(){
     $("#adminContent").innerHTML=`
       <div class="stats"><div><b>${this.places.length}</b><span>Locations</span></div><div><b>${this.campusRoutes.length}</b><span>Campus paths</span></div><div><b>${JSON.parse(localStorage.getItem("campus_favorites")||"[]").length}</b><span>Saved</span></div></div>
-      <div class="admin-actions"><button class="primary-btn" onclick="app.newPlace()">＋ Add location</button><button class="primary-btn" onclick="app.openRouteManager()">🛣️ Campus Routes</button><button class="secondary-btn" onclick="app.exportData()">Export JSON</button><label class="secondary-btn file-label">Import JSON<input type="file" accept=".json" onchange="app.importData(event)" hidden></label><button class="danger-btn" onclick="app.resetData()">Reset demo data</button></div>
+      <div class="admin-actions"><button class="primary-btn" onclick="app.newPlace()">＋ Add location</button><button class="primary-btn" onclick="app.openIndoorMapManager()">🏢 Indoor Maps</button><button class="primary-btn" onclick="app.openRouteManager()">🛣️ Campus Routes</button><button class="secondary-btn" onclick="app.exportData()">Export JSON</button><label class="secondary-btn file-label">Import JSON<input type="file" accept=".json" onchange="app.importData(event)" hidden></label><button class="danger-btn" onclick="app.resetData()">Reset demo data</button></div>
       <div class="admin-list">${this.places.map(p=>`<div class="admin-row"><div><b>${this.escape(p.name)}</b><small>${this.escape(p.category)} · ${this.escape(p.building)}</small></div><button onclick="app.editPlace('${p.id}')">Edit</button><button class="danger-text" onclick="app.deletePlace('${p.id}')">Delete</button></div>`).join("")}</div>`;
+  },
+  openIndoorMapManager(){
+    const modal=document.createElement("div");
+    modal.className="modal";
+    const grouped={};
+    for(const m of (this.indoorMaps||[])){
+      if(!grouped[m.building]) grouped[m.building]=[];
+      grouped[m.building].push(m);
+    }
+    const options=Object.keys(BUILDING_GUIDES).sort().map(b=>`<option value="${this.escapeAttr(b)}">${this.escape(b)}</option>`).join("");
+    const rows=Object.keys(grouped).sort().map(b=>grouped[b].sort((a,z)=>a.floor.localeCompare(z.floor)).map(m=>`<div class="indoor-admin-row"><div><b>${this.escape(m.building)}</b><small>${this.escape(m.floor)}${m.source?" · "+this.escape(m.source):""}</small></div><button class="secondary-btn" data-replace="${this.escapeAttr(m.id)}">Replace</button><button class="danger-text" data-delete-indoor="${this.escapeAttr(m.id)}">Delete</button></div>`).join("")).join("");
+    modal.innerHTML=`<div class="modal-card indoor-admin-card">
+      <div class="modal-head"><div><h3>🏢 Indoor Map Manager</h3><p class="muted" style="margin:4px 0 0">Upload or replace a floor map from the admin panel. No code changes are needed later.</p></div><button type="button" data-close>×</button></div>
+      <div class="indoor-admin-form">
+        <label>BUILDING<select id="indoorBuilding"><option value="">Select existing building</option>${options}</select></label>
+        <label>OR NEW BUILDING<input id="indoorNewBuilding" placeholder="e.g. New Mechanical Block"></label>
+        <label>FLOOR<input id="indoorFloor" placeholder="e.g. 2nd Floor"></label>
+        <label>MAP IMAGE<input id="indoorFile" type="file" accept="image/*,.pdf"></label>
+        <label>SOURCE / NOTE<input id="indoorSource" placeholder="Optional note"></label>
+      </div>
+      <p class="coordinate-help">Use JPG, PNG, WebP or a PDF. Images are optimized in the browser before upload. For PDFs, export the floor plan as an image first for the best mobile experience.</p>
+      <div class="admin-actions"><button type="button" class="primary-btn" data-upload>⬆️ Upload / Replace Map</button></div>
+      <div class="indoor-admin-list">${rows||`<div class="empty" style="padding:25px">No admin-uploaded indoor maps yet.</div>`}</div>
+    </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector("[data-close]").addEventListener("click",()=>modal.remove());
+    modal.addEventListener("click",e=>{if(e.target===modal)modal.remove();});
+    const replaceRecord=(id)=>{
+      const m=this.indoorMaps.find(x=>x.id===id); if(!m)return;
+      modal.querySelector("#indoorBuilding").value=Object.keys(BUILDING_GUIDES).includes(m.building)?m.building:"";
+      modal.querySelector("#indoorNewBuilding").value=m.building;
+      modal.querySelector("#indoorFloor").value=m.floor;
+      modal.querySelector("#indoorSource").value=m.source||"";
+      modal.querySelector("#indoorFile").focus();
+      modal.dataset.replaceId=id;
+      this.toast(`Ready to replace ${m.building} · ${m.floor}. Choose the new map file.`);
+    };
+    modal.querySelectorAll("[data-replace]").forEach(b=>b.addEventListener("click",()=>replaceRecord(b.dataset.replace)));
+    modal.querySelectorAll("[data-delete-indoor]").forEach(b=>b.addEventListener("click",async()=>{
+      const id=b.dataset.deleteIndoor; const m=this.indoorMaps.find(x=>x.id===id); if(!m)return;
+      if(!confirm(`Delete the indoor map for ${m.building} · ${m.floor}?`))return;
+      if(await this.deleteIndoorMap(id)){modal.remove();this.openIndoorMapManager();}
+    }));
+    modal.querySelector("[data-upload]").addEventListener("click",async()=>{
+      const building=(modal.querySelector("#indoorNewBuilding").value.trim()||modal.querySelector("#indoorBuilding").value.trim());
+      const floor=modal.querySelector("#indoorFloor").value.trim();
+      const file=modal.querySelector("#indoorFile").files[0];
+      const source=modal.querySelector("#indoorSource").value.trim();
+      if(!building||!floor||!file){this.toast("Choose a building, floor and map file.");return;}
+      if(file.type==="application/pdf"||file.name.toLowerCase().endsWith(".pdf")){this.toast("Please export the PDF floor plan as JPG/PNG/WebP before uploading.");return;}
+      try{
+        this.toast("Preparing indoor map…");
+        const image=await this.optimizeIndoorImage(file);
+        const payload={id:modal.dataset.replaceId||`im_${Date.now()}`,building,floor,title:building,source:source||file.name,image,note:`Indoor floor map for ${floor}.`};
+        const ok=await this.saveIndoorMap(payload);
+        if(ok){modal.remove();this.renderAdmin();this.toast("Indoor map uploaded and synced.");}
+      }catch(e){this.toast(e.message||"Unable to prepare the map.");}
+    });
+  },
+  optimizeIndoorImage(file){
+    return new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onerror=()=>reject(new Error("Could not read the image."));
+      reader.onload=()=>{
+        const img=new Image();
+        img.onerror=()=>reject(new Error("The selected file is not a supported image."));
+        img.onload=()=>{
+          const max=1800;
+          const scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
+          const w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale));
+          const c=document.createElement("canvas");c.width=w;c.height=h;
+          const ctx=c.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);
+          resolve(c.toDataURL("image/webp",0.84));
+        };
+        img.src=reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  },
+  async saveIndoorMap(mapData){
+    const old=[...(this.indoorMaps||[])];
+    this.indoorMaps=this.indoorMaps.filter(m=>!(m.building===mapData.building&&m.floor===mapData.floor)&&m.id!==mapData.id);
+    this.indoorMaps.push(mapData);
+    localStorage.setItem("campus_indoor_maps",JSON.stringify(this.indoorMaps));
+    this.applyIndoorMaps();
+    if(!this.adminToken){this.toast("Map saved on this device. Log in as admin to sync.");return true;}
+    try{
+      const res=await fetch("/api/indoor-maps",{method:"PUT",headers:{"Content-Type":"application/json","x-admin-token":this.adminToken},body:JSON.stringify(mapData)});
+      if(res.status===401){this.indoorMaps=old;this.applyIndoorMaps();sessionStorage.removeItem("admin_token");this.adminToken="";this.toast("Admin session expired. Please log in again.");return false;}
+      if(!res.ok)throw new Error("server sync failed");
+      await this.loadIndoorMapsFromServer();
+      return true;
+    }catch(e){this.indoorMaps=old;this.applyIndoorMaps();localStorage.setItem("campus_indoor_maps",JSON.stringify(old));this.toast("Map was not synced to the server.");return false;}
+  },
+  async deleteIndoorMap(id){
+    const old=[...(this.indoorMaps||[])];
+    this.indoorMaps=this.indoorMaps.filter(m=>m.id!==id);
+    localStorage.setItem("campus_indoor_maps",JSON.stringify(this.indoorMaps));
+    this.applyIndoorMaps();
+    if(!this.adminToken){this.toast("Deleted on this device. Log in as admin to sync.");return true;}
+    try{
+      const res=await fetch(`/api/indoor-maps?id=${encodeURIComponent(id)}`,{method:"DELETE",headers:{"x-admin-token":this.adminToken}});
+      if(res.status===401)throw new Error("session");
+      if(!res.ok)throw new Error("delete failed");
+      await this.loadIndoorMapsFromServer();
+      return true;
+    }catch(e){this.indoorMaps=old;this.applyIndoorMaps();localStorage.setItem("campus_indoor_maps",JSON.stringify(old));this.toast(e.message==="session"?"Admin session expired. Please log in again.":"Could not delete the server map.");return false;}
   },
   openRouteManager(){
     const modal=document.createElement("div");modal.className="modal";
