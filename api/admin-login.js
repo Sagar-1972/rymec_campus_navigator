@@ -6,7 +6,8 @@ export default function handler(req, res) {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
 
-  const configuredPassword = process.env.ADMIN_PASSWORD;
+  // Works immediately after deployment. For production, set ADMIN_PASSWORD in Vercel.
+  const configuredPassword = process.env.ADMIN_PASSWORD || "admin123";
   const configuredUsername = process.env.ADMIN_USERNAME || "admin";
 
   if (!configuredPassword) {

@@ -18,3 +18,11 @@ The app keeps the original built-in floor maps as fallbacks. An admin-uploaded m
 - Images are optimized in the browser before upload.
 - Server storage uses Vercel Blob through `/api/indoor-maps`.
 - The existing `ADMIN_PASSWORD` authentication/token flow is used.
+
+
+### Admin login
+The project now works immediately after deployment with:
+- Username: `admin`
+- Password: `admin123`
+
+For a deployed/public production site, set the Vercel environment variable `ADMIN_PASSWORD` to your own password. The API will use that value instead of the fallback. Do not put your real password in frontend code.
