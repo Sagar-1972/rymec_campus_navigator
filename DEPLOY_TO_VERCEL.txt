@@ -1,0 +1,20 @@
+RYMEC CAMPUS NAVIGATOR — VERCEL DEPLOYMENT
+
+IMPORTANT:
+This folder is already the website root. Do NOT deploy the parent folder as a nested stage2 folder.
+
+1. Import/upload this folder (or ZIP contents) as a new Vercel project, or replace the current project.
+2. No Build Command is required.
+3. Framework Preset: Other / Static.
+4. Admin login:
+   Username: admin
+   Password: admin123
+5. For production, set ADMIN_PASSWORD in Vercel Environment Variables.
+6. Indoor Maps uses Vercel Blob for persistent storage. Create/connect a Vercel Blob store to this project so BLOB_READ_WRITE_TOKEN is available before using Upload / Replace Map.
+
+Admin Dashboard contains:
+- Add location
+- Indoor Maps
+- Campus Routes
+- Export JSON
+- Import JSON
