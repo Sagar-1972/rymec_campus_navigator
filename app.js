@@ -710,8 +710,8 @@ async init() {
   openRouteManager(){
     const modal=document.createElement("div");modal.className="modal";
     modal.innerHTML=`<div class="modal-card route-manager-card"><div class="modal-head"><div><h3>🛣️ Campus Route Manager</h3><p class="muted" style="margin:4px 0 0">Draw the real roads and walking paths inside RYMEC. Click along the path, then save it.</p></div><button type="button" data-close>×</button></div>
-      <div class="route-manager-toolbar"><select id="routeType"><option value="walking">🚶 Walking path</option><option value="vehicle">🚗 Vehicle road</option><option value="restricted">🚫 Restricted path</option></select><input id="routeName" placeholder="Path name e.g. Main Gate → CSE Block"><button type="button" class="secondary-btn" data-undo>Undo</button><button type="button" class="secondary-btn" data-clear>Clear</button><button type="button" class="primary-btn" data-finish>Finish & Smooth</button></div>
-      <div id="routeManagerMap" class="route-manager-map"></div><div class="route-manager-status" data-status>Click <b>Start drawing</b> on the map by placing the first point.</div>
+      <div class="route-manager-toolbar"><select id="routeType"><option value="walking">🚶 Walking path</option><option value="vehicle">🚗 Vehicle road</option><option value="restricted">🚫 Restricted path</option></select><input id="routeName" placeholder="Path name e.g. Main Gate → CSE Block"><button type="button" class="secondary-btn" data-undo>Undo</button><button type="button" class="secondary-btn" data-clear>Clear</button><button type="button" class="primary-btn" data-finish>Save Route</button></div>
+      <div id="routeManagerMap" class="route-manager-map"></div><div class="route-manager-status" data-status>Click the map to place route points. The saved route will use your exact points.</div>
       <div class="route-list">${this.campusRoutes.length?this.campusRoutes.map(r=>`<div class="route-row"><div><b>${this.escape(r.name||"Unnamed path")}</b><small>${r.type||"walking"} · ${(r.points||[]).length} points</small></div><button class="danger-text" data-delete-route="${this.escapeAttr(r.id)}">Delete</button></div>`).join(""):"<div class='empty' style='padding:25px'>No campus paths yet. Draw your first path above.</div>"}</div>
       <p class="coordinate-help">Tip: Draw continuously along the center of the actual road/path. Add points at every turn and junction. Restricted paths are shown but excluded from normal navigation.</p></div>`;
     document.body.appendChild(modal);
@@ -724,13 +724,7 @@ async init() {
     }
     let points=[],line=null,markers=L.layerGroup().addTo(map);
     const status=modal.querySelector("[data-status]");
-    const smoothRoute=(pts)=>{
-      if(pts.length<3)return pts.slice();
-      const out=[pts[0]];
-      for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1];out.push([a[0]*.25+b[0]*.75,a[1]*.25+b[1]*.75]);out.push([a[0]*.5+b[0]*.5,a[1]*.5+b[1]*.5]);if(i===pts.length-2)out.push([a[0]*.25+b[0]*.75,a[1]*.25+b[1]*.75]);}
-      out.push(pts[pts.length-1]); return out;
-    };
-    const redraw=()=>{if(line)line.remove();line=points.length?L.polyline(points,{color:'#22c55e',weight:6,smoothFactor:1.5,lineCap:'round',lineJoin:'round'}).addTo(map):null;markers.clearLayers();points.forEach((p,i)=>L.circleMarker(p,{radius:i===0||i===points.length-1?7:4,color:'#22c55e',fillOpacity:1,weight:2}).addTo(markers));status.innerHTML=points.length?`Drawing <b>${points.length} points</b>. Add points at turns; Finish & Smooth cleans the shape.`:'Click the map to place the first point.';};
+    const redraw=()=>{if(line)line.remove();line=points.length?L.polyline(points,{color:'#22c55e',weight:6,smoothFactor:1.5,lineCap:'round',lineJoin:'round'}).addTo(map):null;markers.clearLayers();points.forEach((p,i)=>L.circleMarker(p,{radius:i===0||i===points.length-1?7:4,color:'#22c55e',fillOpacity:1,weight:2}).addTo(markers));status.innerHTML=points.length?`Drawing <b>${points.length} points</b>. Points are kept exactly as you place them.`:'Click the map to place the first point.';};
     map.on("click",e=>{const p=[e.latlng.lat,e.latlng.lng],last=points[points.length-1];if(last&&this.distanceMeters(last,p)<4)return;points.push(p);redraw();});
     modal.querySelector("[data-undo]").addEventListener("click",()=>{if(points.length){points.pop();redraw();}});
     modal.querySelector("[data-clear]").addEventListener("click",()=>{points=[];redraw();});
@@ -739,8 +733,7 @@ async init() {
       const type=modal.querySelector("#routeType").value;
       if(points.length<2){this.toast("Place at least two points on the road.");return;}
       const raw=points.map(p=>[+p[0].toFixed(7),+p[1].toFixed(7)]);
-      const smoothed=smoothRoute(raw).map(p=>[+p[0].toFixed(7),+p[1].toFixed(7)]);
-      const ok=await this.saveRoute({id:"r"+Date.now(),name,type,points:raw,displayPoints:smoothed});
+      const ok=await this.saveRoute({id:"r"+Date.now(),name,type,points:raw});
       if(ok){points=[];line?.remove();markers.clearLayers();modal.remove();map.remove();this.toast("Clean campus path saved and synced.");this.renderAdmin();this.openRouteManager();}
     });
     modal.querySelectorAll("[data-delete-route]").forEach(btn=>btn.addEventListener("click",async()=>{const id=btn.dataset.deleteRoute;if(!confirm("Delete this campus path?"))return;this.campusRoutes=this.campusRoutes.filter(r=>r.id!==id);if(await this.saveRoutes()){modal.remove();map.remove();this.renderAdmin();this.openRouteManager();}}));
