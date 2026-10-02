@@ -789,18 +789,28 @@ async init() {
       if(!grouped[m.building]) grouped[m.building]=[];
       grouped[m.building].push(m);
     }
-    const options=Object.keys(BUILDING_GUIDES).sort().map(b=>`<option value="${this.escapeAttr(b)}">${this.escape(b)}</option>`).join("");
+    // Building choices come from the campus directory, not from uploaded maps.
+    // This keeps the selector populated even when there are zero indoor maps.
+    const campusBuildings=[...new Set((this.places||[]).map(p=>String(p.building||"").trim()).filter(Boolean))];
+    const knownBuildings=[
+      "Main Block","CS/ES/IS Block","Library & PG Block","Electrical Block",
+      "Civil Engineering Block","Mechanical Block","Canteen","Girls Waiting Hall",
+      "Generator Room","Polytechnic","Old MEC Block","Old Civil Block","Boys Hostel",
+      "PU College","Auditorium","Indoor Stadium","IGNO Centre"
+    ];
+    const allBuildings=[...new Set([...campusBuildings,...knownBuildings,Object.keys(BUILDING_GUIDES)])].sort((a,b)=>a.localeCompare(b));
+    const options=allBuildings.map(b=>`<option value="${this.escapeAttr(b)}">${this.escape(b)}</option>`).join("");
     const rows=Object.keys(grouped).sort().map(b=>grouped[b].sort((a,z)=>a.floor.localeCompare(z.floor)).map(m=>`<div class="indoor-admin-row"><div><b>${this.escape(m.building)}</b><small>${this.escape(m.floor)}${m.source?" · "+this.escape(m.source):""}</small></div><button class="secondary-btn" data-replace="${this.escapeAttr(m.id)}">Replace</button><button class="danger-text" data-delete-indoor="${this.escapeAttr(m.id)}">Delete</button></div>`).join("")).join("");
     modal.innerHTML=`<div class="modal-card indoor-admin-card">
       <div class="modal-head"><div><h3>🏢 Indoor Map Manager</h3><p class="muted" style="margin:4px 0 0">Upload or replace a floor map from the admin panel. No code changes are needed later.</p></div><button type="button" data-close>×</button></div>
       <div class="indoor-admin-form">
-        <label>BUILDING<select id="indoorBuilding"><option value="">Select existing building</option>${options}</select></label>
-        <label>OR NEW BUILDING<input id="indoorNewBuilding" placeholder="e.g. New Mechanical Block"></label>
+        <label>BUILDING<select id="indoorBuilding"><option value="">Select a campus building</option>${options}</select></label>
+        <label>OR NEW BUILDING<input id="indoorNewBuilding" placeholder="Only if the building is not listed"></label>
         <label>FLOOR<input id="indoorFloor" placeholder="e.g. 2nd Floor"></label>
         <label>MAP IMAGE<input id="indoorFile" type="file" accept="image/*,.pdf"></label>
         <label>SOURCE / NOTE<input id="indoorSource" placeholder="Optional note"></label>
       </div>
-      <p class="coordinate-help">Use JPG, PNG, WebP or a PDF. Images are optimized in the browser before upload. For PDFs, export the floor plan as an image first for the best mobile experience.</p>
+      <p class="coordinate-help">The building list comes from the campus directory, so it remains available even when no indoor maps have been uploaded yet. Use JPG, PNG or WebP. For PDFs, export the floor plan as an image first for the best mobile experience.</p>
       <div class="admin-actions"><button type="button" class="primary-btn" data-upload>⬆️ Upload / Replace Map</button></div>
       <div class="indoor-admin-list">${rows||`<div class="empty" style="padding:25px">No admin-uploaded indoor maps yet.</div>`}</div>
     </div>`;
