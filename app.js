@@ -782,92 +782,95 @@ async init() {
       <div class="admin-list">${this.places.map(p=>`<div class="admin-row"><div><b>${this.escape(p.name)}</b><small>${this.escape(p.category)} · ${this.escape(p.building)}</small></div><button onclick="app.editPlace('${p.id}')">Edit</button><button class="danger-text" onclick="app.deletePlace('${p.id}')">Delete</button></div>`).join("")}</div>`;
   },
   openIndoorMapManager(){
-    // Robust admin modal: build it directly and force it above the dashboard.
-    // This avoids the previous silent/no-output behaviour on some Vercel deployments.
-    try{
-      document.querySelectorAll('.indoor-manager-overlay').forEach(el=>el.remove());
-      const modal=document.createElement('div');
-      modal.className='modal indoor-manager-overlay';
-      modal.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(2,6,23,.62);padding:18px;box-sizing:border-box;';
+    const existing=document.getElementById('indoorManagerModal');
+    if(existing) existing.remove();
+    const modal=document.createElement('div');
+    modal.id='indoorManagerModal';
+    modal.style.cssText='position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:rgba(2,6,23,.68);padding:18px;box-sizing:border-box;';
 
-      const campusBuildings=[...new Set((this.places||[]).map(p=>String(p.building||'').trim()).filter(Boolean))];
-      const knownBuildings=[
-        'Main Block','CS/ES/IS Block','Library & PG Block','Electrical Block',
-        'Civil Engineering Block','Mechanical Block','Canteen','Girls Waiting Hall',
-        'Generator Room','Polytechnic','Old MEC Block','Old Civil Block','Boys Hostel',
-        'PU College','Auditorium','Indoor Stadium','IGNO Centre'
-      ];
-      const allBuildings=[...new Set([...campusBuildings,...knownBuildings,Object.keys(BUILDING_GUIDES||{})])].filter(Boolean).sort((a,b)=>a.localeCompare(b));
-      const options=allBuildings.map(b=>`<option value="${this.escapeAttr(b)}">${this.escape(b)}</option>`).join('');
+    const campusBuildings=[...new Set((Array.isArray(this.places)?this.places:[]).map(p=>String(p.building||'').trim()).filter(Boolean))];
+    const knownBuildings=['Main Block','CS/ES/IS Block','Library & PG Block','Electrical Block','Civil Engineering Block','Mechanical Block','Canteen','Girls Waiting Hall','Generator Room','Polytechnic','Old MEC Block','Old Civil Block','Boys Hostel','PU College','Auditorium','Indoor Stadium','IGNO Centre'];
+    const allBuildings=[...new Set([...campusBuildings,...knownBuildings])].sort((a,b)=>a.localeCompare(b));
+    const esc=v=>this.escape(String(v??''));
+    const attr=v=>this.escapeAttr(String(v??''));
+    const options=allBuildings.map(b=>`<option value="${attr(b)}">${esc(b)}</option>`).join('');
+    const maps=Array.isArray(this.indoorMaps)?this.indoorMaps:[];
+    const rows=maps.length?maps.slice().sort((a,b)=>`${a.building} ${a.floor}`.localeCompare(`${b.building} ${b.floor}`)).map(m=>`<div style="display:flex;gap:8px;align-items:center;padding:12px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;margin-top:8px"><div style="flex:1"><b>${esc(m.building)}</b><small style="display:block;color:#64748b;margin-top:3px">${esc(m.floor)}${m.source?' · '+esc(m.source):''}</small></div><button type="button" class="secondary-btn" data-replace="${attr(m.id)}">Replace</button><button type="button" class="danger-text" data-delete="${attr(m.id)}">Delete</button></div>`).join(''):'<div style="padding:24px;text-align:center;color:#64748b">No admin-uploaded indoor maps yet.</div>';
 
-      const grouped={};
-      for(const m of (this.indoorMaps||[])){
-        if(!grouped[m.building]) grouped[m.building]=[];
-        grouped[m.building].push(m);
-      }
-      const rows=Object.keys(grouped).sort().map(b=>grouped[b].sort((a,z)=>String(a.floor).localeCompare(String(z.floor))).map(m=>`
-        <div class="indoor-admin-row">
-          <div><b>${this.escape(m.building)}</b><small>${this.escape(m.floor)}${m.source?' · '+this.escape(m.source):''}</small></div>
-          <button type="button" class="secondary-btn" data-replace="${this.escapeAttr(m.id)}">Replace</button>
-          <button type="button" class="danger-text" data-delete-indoor="${this.escapeAttr(m.id)}">Delete</button>
-        </div>`).join('')).join('');
-
-      modal.innerHTML=`<div class="modal-card indoor-admin-card" style="width:min(1050px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:20px;padding:20px;box-shadow:0 30px 80px rgba(0,0,0,.35);box-sizing:border-box;">
-        <div class="modal-head">
-          <div><h3 style="margin:0">🏢 Indoor Map Manager</h3><p class="muted" style="margin:4px 0 0">Upload or replace a floor map. No code changes are needed later.</p></div>
-          <button type="button" data-close aria-label="Close">×</button>
-        </div>
-        <div class="indoor-admin-form" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:15px">
-          <label>BUILDING<select id="indoorBuilding" style="display:block;width:100%;margin-top:5px;padding:10px;border:1px solid #cbd5e1;border-radius:9px;background:#fff"><option value="">Select a campus building</option>${options}</select></label>
-          <label>OR NEW BUILDING<input id="indoorNewBuilding" placeholder="Only if the building is not listed" style="display:block;width:100%;margin-top:5px;padding:10px;border:1px solid #cbd5e1;border-radius:9px"></label>
-          <label>FLOOR<input id="indoorFloor" placeholder="e.g. 1st Floor" style="display:block;width:100%;margin-top:5px;padding:10px;border:1px solid #cbd5e1;border-radius:9px"></label>
-          <label>MAP IMAGE<input id="indoorFile" type="file" accept="image/png,image/jpeg,image/webp" style="display:block;width:100%;margin-top:5px;padding:8px;border:1px solid #cbd5e1;border-radius:9px"></label>
-          <label style="grid-column:1/-1">SOURCE / NOTE<input id="indoorSource" placeholder="Optional note" style="display:block;width:100%;margin-top:5px;padding:10px;border:1px solid #cbd5e1;border-radius:9px"></label>
-        </div>
-        <p class="coordinate-help">Buildings come from the campus directory. Upload JPG, PNG or WebP floor maps. Start with any building and any floor.</p>
-        <div class="admin-actions"><button type="button" class="primary-btn" data-upload>⬆️ Upload / Replace Map</button></div>
-        <div class="indoor-admin-list">${rows||'<div class="empty" style="padding:25px">No admin-uploaded indoor maps yet.</div>'}</div>
-      </div>`;
-
-      document.body.appendChild(modal);
-      document.body.style.overflow='hidden';
-      const close=()=>{modal.remove();document.body.style.overflow='';};
-      modal.querySelector('[data-close]').addEventListener('click',close);
-      modal.addEventListener('click',e=>{if(e.target===modal)close();});
-
-      const replaceRecord=(id)=>{
-        const m=(this.indoorMaps||[]).find(x=>x.id===id); if(!m)return;
-        modal.querySelector('#indoorBuilding').value=allBuildings.includes(m.building)?m.building:'';
-        modal.querySelector('#indoorNewBuilding').value=allBuildings.includes(m.building)?'':m.building;
-        modal.querySelector('#indoorFloor').value=m.floor||'';
-        modal.querySelector('#indoorSource').value=m.source||'';
-        modal.dataset.replaceId=id;
-        this.toast(`Ready to replace ${m.building} · ${m.floor}. Choose the new map file.`);
-      };
-      modal.querySelectorAll('[data-replace]').forEach(b=>b.addEventListener('click',()=>replaceRecord(b.dataset.replace)));
-      modal.querySelectorAll('[data-delete-indoor]').forEach(b=>b.addEventListener('click',async()=>{
-        const id=b.dataset.deleteIndoor; const m=(this.indoorMaps||[]).find(x=>x.id===id); if(!m)return;
-        if(!confirm(`Delete the indoor map for ${m.building} · ${m.floor}?`))return;
-        if(await this.deleteIndoorMap(id)){close();this.openIndoorMapManager();}
-      }));
-      modal.querySelector('[data-upload]').addEventListener('click',async()=>{
-        const building=(modal.querySelector('#indoorNewBuilding').value.trim()||modal.querySelector('#indoorBuilding').value.trim());
-        const floor=modal.querySelector('#indoorFloor').value.trim();
-        const file=modal.querySelector('#indoorFile').files[0];
-        const source=modal.querySelector('#indoorSource').value.trim();
-        if(!building||!floor||!file){this.toast('Choose a building, floor and map image.');return;}
-        try{
-          this.toast('Preparing indoor map…');
-          const image=await this.optimizeIndoorImage(file);
-          const payload={id:modal.dataset.replaceId||`im_${Date.now()}`,building,floor,title:building,source:source||file.name,image,note:`Indoor floor map for ${floor}.`};
-          const ok=await this.saveIndoorMap(payload);
-          if(ok){close();this.renderAdmin();this.toast('Indoor map uploaded and synced.');}
-        }catch(e){this.toast(e.message||'Unable to prepare the map.');}
+    modal.innerHTML=`<div style="width:min(1050px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:20px;padding:20px;box-shadow:0 30px 80px rgba(0,0,0,.35);box-sizing:border-box">
+      <div style="display:flex;justify-content:space-between;gap:15px;align-items:flex-start"><div><h3 style="margin:0;font-size:20px">🏢 Indoor Map Manager</h3><p style="margin:5px 0 0;color:#64748b;font-size:12px">Upload, replace or delete floor maps. Buildings come from the campus directory.</p></div><button type="button" data-close style="border:0;background:#f1f5f9;border-radius:9px;font-size:22px;width:36px;height:36px;cursor:pointer">×</button></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px">
+        <label style="font-size:11px;font-weight:800;color:#475569">BUILDING<select id="indoorBuilding" style="display:block;width:100%;margin-top:6px;padding:11px;border:1px solid #cbd5e1;border-radius:9px;background:#fff"><option value="">Select a campus building</option>${options}</select></label>
+        <label style="font-size:11px;font-weight:800;color:#475569">OR NEW BUILDING<input id="indoorNewBuilding" placeholder="Only if not listed" style="display:block;width:100%;margin-top:6px;padding:11px;border:1px solid #cbd5e1;border-radius:9px;box-sizing:border-box"></label>
+        <label style="font-size:11px;font-weight:800;color:#475569">FLOOR<input id="indoorFloor" placeholder="e.g. 1st Floor" style="display:block;width:100%;margin-top:6px;padding:11px;border:1px solid #cbd5e1;border-radius:9px;box-sizing:border-box"></label>
+        <label style="font-size:11px;font-weight:800;color:#475569">MAP IMAGE<input id="indoorFile" type="file" accept="image/png,image/jpeg,image/webp" style="display:block;width:100%;margin-top:6px;padding:8px;border:1px solid #cbd5e1;border-radius:9px;box-sizing:border-box"></label>
+        <label style="grid-column:1/-1;font-size:11px;font-weight:800;color:#475569">SOURCE / NOTE<input id="indoorSource" placeholder="Optional note" style="display:block;width:100%;margin-top:6px;padding:11px;border:1px solid #cbd5e1;border-radius:9px;box-sizing:border-box"></label>
+      </div>
+      <button type="button" class="primary-btn" data-upload style="margin-top:12px">⬆️ Upload / Replace Map</button>
+      <div style="margin-top:18px"><h4 style="margin:0 0 8px">Uploaded Indoor Maps</h4>${rows}</div>
+    </div>`;
+    document.body.appendChild(modal);
+    document.body.style.overflow='hidden';
+    const close=()=>{modal.remove();document.body.style.overflow='';};
+    modal.querySelector('[data-close]').onclick=close;
+    modal.onclick=e=>{if(e.target===modal)close();};
+    modal.querySelectorAll('[data-replace]').forEach(btn=>btn.onclick=()=>{
+      const m=maps.find(x=>String(x.id)===String(btn.dataset.replace)); if(!m)return;
+      const sel=modal.querySelector('#indoorBuilding');
+      if(allBuildings.includes(m.building)) sel.value=m.building; else modal.querySelector('#indoorNewBuilding').value=m.building;
+      modal.querySelector('#indoorFloor').value=m.floor||'';
+      modal.querySelector('#indoorSource').value=m.source||'';
+      modal.dataset.replaceId=m.id;
+      this.toast(`Ready to replace ${m.building} · ${m.floor}.`);
+    });
+    modal.querySelectorAll('[data-delete]').forEach(btn=>btn.onclick=async()=>{
+      const m=maps.find(x=>String(x.id)===String(btn.dataset.delete)); if(!m)return;
+      if(!confirm(`Delete the indoor map for ${m.building} · ${m.floor}?`))return;
+      const ok=await this.deleteIndoorMap(m.id); if(ok){close();this.openIndoorMapManager();}
+    });
+    modal.querySelector('[data-upload]').onclick=async()=>{
+      const building=(modal.querySelector('#indoorNewBuilding').value.trim()||modal.querySelector('#indoorBuilding').value.trim());
+      const floor=modal.querySelector('#indoorFloor').value.trim();
+      const file=modal.querySelector('#indoorFile').files[0];
+      const source=modal.querySelector('#indoorSource').value.trim();
+      if(!building||!floor||!file){this.toast('Choose a building, floor and map image.');return;}
+      try{
+        this.toast('Preparing indoor map…');
+        const image=await this.optimizeIndoorImage(file);
+        const payload={id:modal.dataset.replaceId||`im_${Date.now()}`,building,floor,title:building,source:source||file.name,image,note:`Indoor floor map for ${floor}.`};
+        const ok=await this.saveIndoorMap(payload);
+        if(ok){close();this.renderAdmin();this.toast('Indoor map uploaded and synced.');}
+      }catch(e){console.error(e);this.toast(e?.message||'Unable to upload the map.');}
+    };
+  },
+  openIndoorMapsForUsers(){
+    const existing=document.getElementById('userIndoorModal');
+    if(existing) existing.remove();
+    const modal=document.createElement('div');
+    modal.id='userIndoorModal';
+    modal.style.cssText='position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:rgba(2,6,23,.68);padding:18px;box-sizing:border-box;';
+    const maps=Array.isArray(this.indoorMaps)?this.indoorMaps:[];
+    const buildings=[...new Set(maps.map(m=>m.building).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+    const esc=v=>this.escape(String(v??''));
+    const options=buildings.map(b=>`<option value="${this.escapeAttr(b)}">${esc(b)}</option>`).join('');
+    modal.innerHTML=`<div style="width:min(1050px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:20px;padding:20px;box-sizing:border-box;box-shadow:0 30px 80px rgba(0,0,0,.35)"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><h3 style="margin:0">🏢 Indoor Maps</h3><p style="margin:5px 0;color:#64748b;font-size:12px">Choose a building and floor to view the admin-uploaded floor map.</p></div><button type="button" data-close style="border:0;background:#f1f5f9;border-radius:9px;font-size:22px;width:36px;height:36px">×</button></div>
+      ${buildings.length?`<label style="display:block;margin-top:18px;font-size:11px;font-weight:800;color:#475569">BUILDING<select id="userIndoorBuilding" style="display:block;width:100%;margin-top:6px;padding:11px;border:1px solid #cbd5e1;border-radius:9px;background:#fff"><option value="">Select building</option>${options}</select></label><div id="userIndoorFloors" style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0"></div><div id="userIndoorImage"></div>`:`<div style="padding:35px 10px;text-align:center;color:#64748b"><h3 style="color:#0f172a">No indoor maps available yet</h3><p>The campus administrator has not uploaded any floor maps.</p></div>`}
+    </div>`;
+    document.body.appendChild(modal); document.body.style.overflow='hidden';
+    const close=()=>{modal.remove();document.body.style.overflow='';};
+    modal.querySelector('[data-close]').onclick=close; modal.onclick=e=>{if(e.target===modal)close();};
+    const renderBuilding=()=>{
+      const b=modal.querySelector('#userIndoorBuilding')?.value; const list=maps.filter(m=>m.building===b);
+      const floors=[...new Set(list.map(m=>m.floor).filter(Boolean))];
+      const floorBox=modal.querySelector('#userIndoorFloors'), imageBox=modal.querySelector('#userIndoorImage');
+      if(!floorBox)return;
+      floorBox.innerHTML=floors.map((f,i)=>`<button type="button" class="secondary-btn" data-floor="${this.escapeAttr(f)}">${esc(f)}</button>`).join(''); imageBox.innerHTML='';
+      floorBox.querySelectorAll('[data-floor]').forEach(btn=>btn.onclick=()=>{
+        const m=list.find(x=>x.floor===btn.dataset.floor); if(!m)return;
+        imageBox.innerHTML=`<h4 style="margin:12px 0 6px">${esc(b)} · ${esc(m.floor)}</h4><img src="${m.image}" alt="${esc(b)} ${esc(m.floor)} floor map" style="display:block;width:100%;max-height:65vh;object-fit:contain;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px">`;
       });
-    }catch(e){
-      console.error('Indoor Map Manager error:',e);
-      this.toast('Indoor Maps could not be opened. Please refresh and try again.');
-    }
+    };
+    modal.querySelector('#userIndoorBuilding')?.addEventListener('change',renderBuilding);
   },
   optimizeIndoorImage(file){
     return new Promise((resolve,reject)=>{
