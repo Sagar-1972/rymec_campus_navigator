@@ -140,7 +140,13 @@
         <button onclick="app.openCategories('Laboratory')"><b>🧪</b><span>Laboratories</span></button>
         <button onclick="app.openCategories('Office')"><b>👨‍💼</b><span>Offices</span></button>
         <button onclick="app.openCategories('Facility')"><b>⭐</b><span>Facilities</span></button>
+        <button onclick="app.openIndoorMapsForUsers()"><b>🏢</b><span>Indoor Maps</span></button>
         <button onclick="app.show('favorites')"><b>♥</b><span>Favorites</span></button>
+      </div>
+
+      <div id="userIndoorSection" class="campus-media" hidden>
+        <div class="section-head"><h2>Indoor Maps</h2><span class="eyebrow">FLOOR GUIDES</span></div>
+        <div id="userIndoorList" class="place-grid"></div>
       </div>
 
       <div class="section-head"><h2>Popular places</h2><button onclick="app.show('places')">View all</button></div>

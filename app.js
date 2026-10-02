@@ -338,7 +338,7 @@ async init() {
     const fav = this.isFavorite(p.id);
     return `<article class="place-card" onclick="app.showDetails('${p.id}')">
       <div class="place-icon ${p.category.toLowerCase()}">${this.icon(p.category)}</div>
-      <div class="place-info"><h3>${this.escape(p.name)}</h3><p>${this.escape(p.building)}${p.room ? " · "+this.escape(p.room):""}</p>${detailed?`<small>${this.escape(p.description)}</small>`:""}</div>
+      <div class="place-info"><h3>${this.escape(p.name)}</h3><p>${this.escape(p.building)}${p.room ? " · "+this.escape(p.room):""}</p>${detailed?`<small>${this.escape(p.description)}</small>`:""}${this.buildingGuideFor(p)?`<button type="button" class="secondary-btn" style="margin-top:8px;padding:7px 10px;font-size:11px" onclick="event.stopPropagation();app.openIndoorGuide('${this.escapeAttr(p.building)}','${this.escapeAttr(p.floor)}')">🏢 Indoor Guide</button>`:""}</div>
       <button class="heart ${fav?"on":""}" onclick="event.stopPropagation();app.toggleFavorite('${p.id}')">${fav?"♥":"♡"}</button>
     </article>`;
   },
@@ -696,7 +696,7 @@ async init() {
     let f=JSON.parse(localStorage.getItem("campus_favorites")||"[]");
     f=f.includes(id)?f.filter(x=>x!==id):[...f,id];
     localStorage.setItem("campus_favorites",JSON.stringify(f));
-    this.renderPopular();this.renderPlaces();this.renderFavorites();
+    this.renderPopular();this.renderPlaces();this.renderFavorites();this.renderUserIndoorMaps();
     this.toast(f.includes(id)?"Added to favorites":"Removed from favorites");
   },
   renderFavorites(){
