@@ -8,83 +8,10 @@ window.CAMPUS_CONFIG = {
 };
 
 
-const BUILDING_GUIDES = {
-  "Main Block": {
-    title:"Main Block RYMEC",
-    source:"User-supplied Main Block floor maps",
-    floors:["1st Floor","2nd Floor","3rd Floor"],
-    maps:{
-      "1st Floor":"media/plans/main-block-1st-floor.jpg",
-      "2nd Floor":"media/plans/main-block-2nd-floor.jpg",
-      "3rd Floor":"media/plans/main-block-3rd-floor.jpg"
-    },
-    image:"media/plans/main-block-1st-floor.jpg",
-    note:"Three separate Main Block floor maps supplied for the 1st, 2nd and 3rd floors."
-  },
-  "CSE Block": {
-    title:"CS & IS Block",
-    source:"02 CS & IS BLOCK.pdf",
-    image:"media/plans/cs-is-block.png",
-    floors:["1st Floor","2nd Floor"],
-    note:"The supplied drawing contains first- and second-floor layouts, including rooms, labs, stairs and the entrance area."
-  },
-  "CS & IS Block": {
-    title:"CS & IS Block",
-    source:"02 CS & IS BLOCK.pdf",
-    image:"media/plans/cs-is-block.png",
-    floors:["1st Floor","2nd Floor"],
-    note:"The supplied drawing contains first- and second-floor layouts, including rooms, labs, stairs and the entrance area."
-  },
-  "Library Block": {
-    title:"Central Library & PG Block",
-    source:"06 LIBRARY AND PG BLOCK.pdf",
-    image:"media/plans/library-pg-block.png",
-    floors:["Existing Ground Floor","1st Floor","2nd Floor"],
-    note:"The supplied plan shows the existing ground floor plus first- and second-floor layouts."
-  },
-  "Civil Engineering Block": {
-    title:"Civil Engineering Block",
-    source:"07 CIVIL ENG BLOCK.pdf",
-    image:"media/plans/civil-block.png",
-    floors:["1st Floor"],
-    note:"Floor-plan reference from the supplied Civil Engineering Block drawing."
-  },
-  "Electrical Block": {
-    title:"Electrical Department",
-    source:"08 ELECTRICALBLOCK.pdf",
-    image:"media/plans/electrical-block.png",
-    floors:["Ground Floor","1st Floor"],
-    note:"The supplied Electrical Department plan shows the entrance/stair area, ground-floor rooms and first-floor classrooms."
-  },
-  "Mechanical Block": {
-    title:"Mechanical Engineering Block",
-    source:"09 MECH RYMEC .dwg New.pdf",
-    image:"media/plans/mechanical-block.png",
-    floors:["Existing Block / Ground Floor","Upper Floor Plan"],
-    note:"Floor-plan reference from the supplied Mechanical Engineering Block drawing."
-  },
-  "Canteen": {
-    title:"Canteen",
-    source:"14 Canteen.pdf",
-    image:"media/plans/canteen.png",
-    floors:["Ground Floor","Upper Floor Plan"],
-    note:"Building plan and elevation from the supplied Canteen drawing."
-  },
-  "Girls Waiting Hall": {
-    title:"Girls Waiting Hall",
-    source:"13 GIRLS WAITING HALL.pdf",
-    image:"media/plans/girls-waiting-hall.png",
-    floors:["1st Floor"],
-    note:"Floor plan, elevation and section from the supplied Girls Waiting Hall drawing."
-  },
-  "Generator Room": {
-    title:"Generator / Power House",
-    source:"05 GENERATOR ROOM DWG.pdf",
-    image:"media/plans/generator-room.png",
-    floors:["Existing Power House"],
-    note:"Existing power-house plan, elevation and section from the supplied drawing."
-  }
-};
+// Indoor floor maps are intentionally admin-managed only.
+// No built-in/old floor maps are bundled; administrators add or replace
+// building/floor maps from Admin -> Indoor Maps.
+const BUILDING_GUIDES = {};
 
 const DEFAULT_PLACES = [
   {id:"main",name:"Main Block",category:"Building",description:"Main academic and administrative block.",building:"Main Block",floor:"Ground Floor",room:"",lat:15.13955,lng:76.92135},
@@ -197,11 +124,11 @@ async init() {
       const data=await res.json();
       if(Array.isArray(data.maps)){
         this.indoorMaps=data.maps;
-        localStorage.setItem("campus_indoor_maps",JSON.stringify(this.indoorMaps));
+        localStorage.setItem("campus_indoor_maps_v2",JSON.stringify(this.indoorMaps));
         this.applyIndoorMaps();
       }
     }catch(e){
-      try{this.indoorMaps=JSON.parse(localStorage.getItem("campus_indoor_maps")||"[]");}catch{this.indoorMaps=[];}
+      try{this.indoorMaps=JSON.parse(localStorage.getItem("campus_indoor_maps_v2")||"[]");}catch{this.indoorMaps=[];}
       this.applyIndoorMaps();
     }
   },
@@ -936,7 +863,7 @@ async init() {
     const old=[...(this.indoorMaps||[])];
     this.indoorMaps=this.indoorMaps.filter(m=>!(m.building===mapData.building&&m.floor===mapData.floor)&&m.id!==mapData.id);
     this.indoorMaps.push(mapData);
-    localStorage.setItem("campus_indoor_maps",JSON.stringify(this.indoorMaps));
+    localStorage.setItem("campus_indoor_maps_v2",JSON.stringify(this.indoorMaps));
     this.applyIndoorMaps();
     if(!this.adminToken){this.toast("Map saved on this device. Log in as admin to sync.");return true;}
     try{
@@ -945,12 +872,12 @@ async init() {
       if(!res.ok)throw new Error("server sync failed");
       await this.loadIndoorMapsFromServer();
       return true;
-    }catch(e){this.indoorMaps=old;this.applyIndoorMaps();localStorage.setItem("campus_indoor_maps",JSON.stringify(old));this.toast("Map was not synced to the server.");return false;}
+    }catch(e){this.indoorMaps=old;this.applyIndoorMaps();localStorage.setItem("campus_indoor_maps_v2",JSON.stringify(old));this.toast("Map was not synced to the server.");return false;}
   },
   async deleteIndoorMap(id){
     const old=[...(this.indoorMaps||[])];
     this.indoorMaps=this.indoorMaps.filter(m=>m.id!==id);
-    localStorage.setItem("campus_indoor_maps",JSON.stringify(this.indoorMaps));
+    localStorage.setItem("campus_indoor_maps_v2",JSON.stringify(this.indoorMaps));
     this.applyIndoorMaps();
     if(!this.adminToken){this.toast("Deleted on this device. Log in as admin to sync.");return true;}
     try{
@@ -959,7 +886,7 @@ async init() {
       if(!res.ok)throw new Error("delete failed");
       await this.loadIndoorMapsFromServer();
       return true;
-    }catch(e){this.indoorMaps=old;this.applyIndoorMaps();localStorage.setItem("campus_indoor_maps",JSON.stringify(old));this.toast(e.message==="session"?"Admin session expired. Please log in again.":"Could not delete the server map.");return false;}
+    }catch(e){this.indoorMaps=old;this.applyIndoorMaps();localStorage.setItem("campus_indoor_maps_v2",JSON.stringify(old));this.toast(e.message==="session"?"Admin session expired. Please log in again.":"Could not delete the server map.");return false;}
   },
   openRouteManager(){
     const modal=document.createElement("div");modal.className="modal";
