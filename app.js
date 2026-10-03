@@ -721,6 +721,12 @@ async init() {
     $("#favoritesList").innerHTML=list.length?list.map(p=>this.placeCard(p,true)).join(""):`<div class="empty"><div class="empty-icon">♡</div><h3>No saved places</h3><p>Tap the heart on any location to save it.</p></div>`;
   },
 
+  askExample(q){
+    this.openAssistant();
+    const input=$("#chatInput");
+    input.value=q;
+    this.askAssistant();
+  },
   openAssistant(){
     $("#assistantModal").hidden=false;
     if(!$("#chat").children.length)this.addChat("bot","Hi! I’m your RYMEC AI Campus Assistant. Ask me where a classroom, lab, office or facility is, for example: “Where is LH-01?” or “How do I reach the Computer Lab?”");
