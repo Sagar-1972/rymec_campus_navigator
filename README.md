@@ -44,6 +44,6 @@ This build combines the requested five improvements in one version:
 - indoor map display alongside AI answers
 
 ### Optional AI configuration
-Set `OPENAI_API_KEY` in Vercel to enable visual AI analysis of uploaded indoor maps. Optionally set `OPENAI_MODEL` (default: `gpt-4.1-mini`).
+Set `GEMINI_API_KEY` in Vercel to enable visual AI analysis of uploaded indoor maps. Optionally set `OPENAI_MODEL` (default: `gpt-4.1-mini`).
 
 Without an API key, the assistant falls back to the campus directory data already available in the app; it does not pretend to have analyzed the image.
