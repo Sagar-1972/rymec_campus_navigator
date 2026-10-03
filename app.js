@@ -15,6 +15,9 @@ const BUILDING_GUIDES = {};
 
 const DEFAULT_PLACES = [
   {id:"main",name:"Main Block",category:"Building",description:"Main academic and administrative block.",building:"Main Block",floor:"Ground Floor",room:"",lat:15.13955,lng:76.92135},
+  ...Array.from({length:7},(_,i)=>({id:`lh${i+1}`,name:`LH-${String(i+1).padStart(2,"0")}`,category:"Classroom",description:"Lecture hall in the Main Block.",building:"Main Block",floor:"Ground Floor",room:`LH-${String(i+1).padStart(2,"0")}`,lat:15.13955,lng:76.92135})),
+  ...Array.from({length:9},(_,i)=>({id:`lh1${i+1}`,name:`LH-${101+i}`,category:"Classroom",description:"Lecture hall in the Main Block.",building:"Main Block",floor:"1st Floor",room:`LH-${101+i}`,lat:15.13960,lng:76.92142})),
+  ...Array.from({length:11},(_,i)=>({id:`lh2${i+1}`,name:`LH-${201+i}`,category:"Classroom",description:"Lecture hall in the Main Block.",building:"Main Block",floor:"2nd Floor",room:`LH-${201+i}`,lat:15.13960,lng:76.92142})),
   {id:"cse101",name:"CSE Computer Laboratory",category:"Laboratory",description:"Computer Science and Engineering laboratory.",building:"CSE Block",floor:"1st Floor",room:"CSE-101",lat:15.13975,lng:76.92110},
   {id:"cse302",name:"CSE Classroom 302",category:"Classroom",description:"CSE classroom for theory sessions.",building:"CSE Block",floor:"2nd Floor",room:"CSE-302",lat:15.13972,lng:76.92105},
   {id:"library",name:"Central Library",category:"Facility",description:"Books, digital resources and study spaces.",building:"Library Block",floor:"Ground Floor",room:"",lat:15.13915,lng:76.92165},
@@ -734,18 +737,62 @@ async init() {
   closeAssistant(){$("#assistantModal").hidden=true;},
   addChat(who,msg,html=false){$("#chat").insertAdjacentHTML("beforeend",`<div class="bubble ${who}">${html?msg:this.escape(msg)}</div>`);$("#chat").scrollTop=$("#chat").scrollHeight;},
   findIndoorMapForQuestion(q){
-    const text=(q||'').toLowerCase();
+    const text=(q||'').toLowerCase().replace(/[–—]/g,'-');
     const maps=Array.isArray(this.indoorMaps)?this.indoorMaps:[];
-    // Prefer a place whose name/room/building/floor matches the question.
-    const found=this.places.find(p=>[p.name,p.room,p.building,p.floor].filter(Boolean).some(v=>text.includes(String(v).toLowerCase())));
+    const allPlaces=[...(Array.isArray(this.places)?this.places:[]),...DEFAULT_PLACES];
+    const aliases=[
+      [/\blh\s*-?0*([1-7])\b/i,'Main Block','Ground Floor'],
+      [/\blh\s*-?(10[1-9])\b/i,'Main Block','1st Floor'],
+      [/\blh\s*-?(20[1-9]|21[01])\b/i,'Main Block','2nd Floor']
+    ];
+    let found=allPlaces.find(p=>[p.name,p.room].filter(Boolean).some(v=>text.includes(String(v).toLowerCase())));
+    if(!found){
+      for(const [re,building,floor] of aliases){
+        if(re.test(text)){
+          const m=text.match(re), room=m?.[1]?`LH-${String(m[1]).padStart(2,'0')}`:null;
+          found=allPlaces.find(p=>room && (p.room===room || p.name===room)) || (room?{name:room,room,building,floor,description:'Lecture hall in the Main Block.'}:null);
+          break;
+        }
+      }
+    }
     if(found){
-      const m=maps.find(x=>x.building===found.building && x.floor===found.floor) || maps.find(x=>x.building===found.building);
-      return {place:found,map:m||null};
+      const exact=maps.find(x=>String(x.building).toLowerCase()===String(found.building).toLowerCase() && String(x.floor).toLowerCase()===String(found.floor).toLowerCase());
+      const byBuilding=maps.find(x=>String(x.building).toLowerCase()===String(found.building).toLowerCase());
+      return {place:found,map:exact||byBuilding||null};
     }
     for(const m of maps){
       if(text.includes(String(m.building||'').toLowerCase())||text.includes(String(m.floor||'').toLowerCase()))return {place:null,map:m};
     }
     return {place:null,map:null};
+  },
+  cropIndoorMapForAI(dataUrl){
+    return new Promise(resolve=>{
+      if(!dataUrl || !String(dataUrl).startsWith('data:image/')) return resolve(dataUrl);
+      const img=new Image();
+      img.onload=()=>{
+        try{
+          const w=img.naturalWidth,h=img.naturalHeight;
+          const c=document.createElement('canvas'); c.width=w; c.height=h;
+          const ctx=c.getContext('2d',{willReadFrequently:true}); ctx.drawImage(img,0,0);
+          const d=ctx.getImageData(0,0,w,h).data;
+          let minX=w,minY=h,maxX=-1,maxY=-1;
+          const step=Math.max(1,Math.floor(Math.max(w,h)/1200));
+          for(let y=0;y<h;y+=step) for(let x=0;x<w;x+=step){
+            const i=(y*w+x)*4, r=d[i],g=d[i+1],b=d[i+2],a=d[i+3];
+            if(a>20 && (r<242 || g<242 || b<242)) { minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y); }
+          }
+          if(maxX<0) return resolve(dataUrl);
+          const pad=Math.max(8,Math.round(Math.min(w,h)*0.015));
+          minX=Math.max(0,minX-pad);minY=Math.max(0,minY-pad);maxX=Math.min(w-1,maxX+pad);maxY=Math.min(h-1,maxY+pad);
+          const cw=maxX-minX+1,ch=maxY-minY+1;
+          if(cw/w>0.94 && ch/h>0.94) return resolve(dataUrl);
+          const out=document.createElement('canvas');out.width=cw;out.height=ch;
+          out.getContext('2d').drawImage(img,minX,minY,cw,ch,0,0,cw,ch);
+          resolve(out.toDataURL('image/webp',0.9));
+        }catch(e){resolve(dataUrl);}
+      };
+      img.onerror=()=>resolve(dataUrl); img.src=dataUrl;
+    });
   },
   async askAssistant(){
     const input=$("#chatInput"), q=input.value.trim(); if(!q)return; input.value='';
@@ -753,25 +800,30 @@ async init() {
     this.addChat('bot','Analyzing the campus information and relevant indoor map…');
     try{
       const ctx=this.findIndoorMapForQuestion(q);
-      const payload={question:q,place:ctx.place?{name:ctx.place.name,building:ctx.place.building,floor:ctx.place.floor,room:ctx.place.room,description:ctx.place.description}:null,map:ctx.map?{building:ctx.map.building,floor:ctx.map.floor,title:ctx.map.title,note:ctx.map.note,image:ctx.map.image}:null};
+      const place=ctx.place;
+      const aiImage=ctx.map?.image?await this.cropIndoorMapForAI(ctx.map.image):null;
+      const payload={question:q,place:place?{name:place.name,building:place.building,floor:place.floor,room:place.room,description:place.description}:null,map:ctx.map?{building:ctx.map.building,floor:ctx.map.floor,title:ctx.map.title,note:ctx.map.note,image:ctx.map.image,imageForAI:aiImage}:null};
       const res=await fetch('/api/indoor-ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       const data=await res.json();
       $("#chat").lastElementChild?.remove();
       if(data.ok){
-        const safe=this.escape(data.answer||'I could not determine the location.');
-        this.addChat('bot',safe);
+        let answer=this.escape(data.answer||'I could not determine the location.');
+        if(place && /not (?:contain|display|specif)|cannot determine|no information/i.test(answer)){
+          answer=this.escape(`${place.name} is in ${place.building}, ${place.floor}${place.room?' ('+place.room+')':''}. The map below shows the relevant floor.`);
+        }
+        this.addChat('bot',answer);
         if(data.map?.image){
           const loc=data.map.location||null;
           let overlay='';
           if(loc && Number.isFinite(Number(loc.x)) && Number.isFinite(Number(loc.y))){
             const x=Math.max(0,Math.min(100,Number(loc.x)/10));
             const y=Math.max(0,Math.min(100,Number(loc.y)/10));
-            const w=Math.max(1,Math.min(100-x,Number(loc.width||60)/10));
-            const h=Math.max(1,Math.min(100-y,Number(loc.height||60)/10));
-            const label=this.escape(loc.label||'Location');
+            const w=Math.max(1,Math.min(100-x,Number(loc.width||70)/10));
+            const h=Math.max(1,Math.min(100-y,Number(loc.height||70)/10));
+            const label=this.escape(loc.label||place?.name||'Location');
             overlay=`<div class="ai-map-highlight" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%;"><span>${label}</span></div>`;
           }
-          const wrap=`<div class="ai-map-result"><b>${this.escape(data.map.building)} · ${this.escape(data.map.floor)}</b><div class="ai-map-stage"><img src="${data.map.image}" alt="Relevant indoor floor map">${overlay}</div><small>${this.escape(data.map.highlight||'Relevant floor map')}${loc?.confidence?` · Highlight confidence: ${this.escape(loc.confidence)}`:''}</small></div>`;
+          const wrap=`<div class="ai-map-result"><b>${this.escape(data.map.building||place?.building||'Indoor Map')} · ${this.escape(data.map.floor||place?.floor||'')}</b><div class="ai-map-stage"><img src="${data.map.image}" alt="Relevant indoor floor map">${overlay}</div><small>${this.escape(data.map.highlight||'Relevant floor map')}${loc?.confidence?` · Highlight confidence: ${this.escape(loc.confidence)}`:''}</small></div>`;
           $("#chat").insertAdjacentHTML('beforeend',wrap);
           $("#chat").scrollTop=$("#chat").scrollHeight;
         }
@@ -780,7 +832,10 @@ async init() {
       $("#chat").lastElementChild?.remove();
       const ctx=this.findIndoorMapForQuestion(q), p=ctx.place;
       if(p){
-        this.addChat('bot',`${p.name} is in ${p.building}, ${p.floor}${p.room?' ('+p.room+')':''}. The relevant indoor map is shown in the Indoor Maps section.`);
+        this.addChat('bot',`${p.name} is in ${p.building}, ${p.floor}${p.room?' ('+p.room+')':''}. The relevant indoor map is shown below.`);
+        if(ctx.map?.image){
+          this.addChat('bot',`<div class="ai-map-result"><b>${this.escape(ctx.map.building)} · ${this.escape(ctx.map.floor)}</b><div class="ai-map-stage"><img src="${ctx.map.image}" alt="Relevant indoor floor map"></div></div>`,true);
+        }
       }else{
         this.addChat('bot','I could not analyze that request right now. Try a room name such as “LH-01”, a lab name, or a building/floor.');
       }
