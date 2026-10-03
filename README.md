@@ -33,3 +33,17 @@ Do not store the admin password in source code. Keep `ADMIN_PASSWORD` in Vercel 
 
 ## Indoor floor guides
 The app now includes indoor floor-plan references derived from the supplied RYMEC building PDFs. Location details whose `building` matches a supported guide show an **Indoor Guide** button, and the navigation-ready/arrival panel also provides the floor guide. This stage is a visual floor-plan guide; it does not claim live indoor GPS positioning.
+
+## Unified navigation + AI indoor assistant upgrade
+
+This build combines the requested five improvements in one version:
+- accuracy-aware destination arrival detection
+- smoother live navigation/progress and off-route handling
+- clearer navigation step distances
+- AI indoor assistant using admin-uploaded floor-map images
+- indoor map display alongside AI answers
+
+### Optional AI configuration
+Set `OPENAI_API_KEY` in Vercel to enable visual AI analysis of uploaded indoor maps. Optionally set `OPENAI_MODEL` (default: `gpt-4.1-mini`).
+
+Without an API key, the assistant falls back to the campus directory data already available in the app; it does not pretend to have analyzed the image.

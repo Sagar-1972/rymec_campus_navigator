@@ -47,6 +47,9 @@ const app = {
   userAccuracyCircle: null,
   lastHeading: 0,
   lastRerouteAt: 0,
+  arrivalStableCount: 0,
+  lastArrivalDistance: Infinity,
+  lastPositionTime: 0,
   adminToken: sessionStorage.getItem("admin_token") || "",
   campusRoutes: [],
   indoorMaps: [],
@@ -472,6 +475,8 @@ async init() {
     this.stopNavigation(false);
     this.navigationDestination=p;
     this.navigationDestination._arrived=false;
+    this.arrivalStableCount=0;
+    this.lastArrivalDistance=Infinity;
     this.navigationStarted=true;
     this.showNavigationLoading(p);
     if(this.currentLocation) this.buildRoute(p,true); else this.locate(()=>this.buildRoute(p,true));
@@ -537,12 +542,22 @@ async init() {
     }
     if(this.navigationDestination && this.navigationRoute){
       const distance=this.map.distance(this.currentLocation,[this.navigationDestination.lat,this.navigationDestination.lng]);
-      if(distance<=30){this.reachedDestination(distance);return;}
+      const accuracy=Math.max(5,Number(pos.coords.accuracy||20));
+      // GPS can report a position several metres away from the real user. Do not
+      // declare arrival from one noisy reading. Require a small, accuracy-aware
+      // radius and two consecutive good readings.
+      const arrivalRadius=Math.min(18,Math.max(6,Math.min(accuracy*0.55,12)));
+      if(distance<=arrivalRadius){
+        this.arrivalStableCount=(this.lastArrivalDistance<Infinity && distance<=this.lastArrivalDistance+2) ? this.arrivalStableCount+1 : 1;
+        if(this.arrivalStableCount>=2){this.reachedDestination(distance);return;}
+      }else{this.arrivalStableCount=0;}
+      this.lastArrivalDistance=distance;
       const nearest=this.nearestRouteIndex(this.currentLocation);
       if(nearest>=0){
         const nearestCoord=this.navigationRoute.geometry.coordinates[nearest];
         const offRoute=this.map.distance(this.currentLocation,[nearestCoord[1],nearestCoord[0]]);
-        if(offRoute>60 && Date.now()-this.lastRerouteAt>15000){
+        const offRouteLimit=Math.max(45,Math.min(75,Number(pos.coords.accuracy||20)*2.5));
+        if(offRoute>offRouteLimit && Date.now()-this.lastRerouteAt>12000){
           this.lastRerouteAt=Date.now();
           this.buildRoute(this.navigationDestination,true);
           return;
@@ -629,9 +644,10 @@ async init() {
     const d=end?this.map.distance(this.currentLocation,[end[1],end[0]]):0;
     const icon=({left:'↰',right:'↱',straight:'↑',slight_left:'↖',slight_right:'↗',sharp_left:'↙',sharp_right:'↘',uturn:'↶'}[step.maneuver?.modifier]||'↑');
     const text=this.formatStep(step);
+    const distanceText=d<1000 ? `${Math.round(d)} m` : `${(d/1000).toFixed(1)} km`;
     const total=this.navigationSteps.length;
     $("#routePanel").hidden=false;
-    $("#routePanel").innerHTML=`<div class="nav-direction"><div class="nav-turn">${icon}</div><div class="nav-copy"><strong>${this.escape(text)}</strong><small>Step ${Math.min(next+1,total)} of ${total}</small></div></div><div class="nav-progress"><i id="navProgress"></i></div><div class="nav-actions"><button type="button" class="secondary-btn nav-stop-btn" onclick="app.stopNavigation(true)">⏹ Stop Navigation</button></div>`;
+    $("#routePanel").innerHTML=`<div class="nav-direction"><div class="nav-turn">${icon}</div><div class="nav-copy"><strong>${this.escape(text)}</strong><small>${distanceText} · Step ${Math.min(next+1,total)} of ${total}</small></div></div><div class="nav-progress"><i id="navProgress"></i></div><div class="nav-actions"><button type="button" class="secondary-btn nav-stop-btn" onclick="app.stopNavigation(true)">⏹ Stop Navigation</button></div>`;
     const nearest=this.nearestRouteIndex(this.currentLocation);
     if(nearest>=0 && this.navigationRoute.geometry.coordinates.length>1){$("#navProgress").style.width=(nearest/(this.navigationRoute.geometry.coordinates.length-1)*100)+"%";}
   },
@@ -707,19 +723,53 @@ async init() {
 
   openAssistant(){
     $("#assistantModal").hidden=false;
-    if(!$("#chat").children.length)this.addChat("bot","Hi! I can help you find places on campus. Try “Where is the library?”");
+    if(!$("#chat").children.length)this.addChat("bot","Hi! I’m your RYMEC AI Campus Assistant. Ask me where a classroom, lab, office or facility is, for example: “Where is LH-01?” or “How do I reach the Computer Lab?”");
   },
   closeAssistant(){$("#assistantModal").hidden=true;},
-  addChat(who,msg){$("#chat").insertAdjacentHTML("beforeend",`<div class="bubble ${who}">${this.escape(msg)}</div>`);$("#chat").scrollTop=$("#chat").scrollHeight;},
-  askAssistant(){
-    const input=$("#chatInput"), q=input.value.trim(); if(!q)return; input.value="";
-    this.addChat("user",q);
-    const found=this.places.find(p=>[p.name,p.category,p.building,p.room].join(" ").toLowerCase().includes(q.toLowerCase()));
-    let reply;
-    if(found) reply=`${found.name} is in ${found.building}, ${found.floor}${found.room?" ("+found.room+")":""}. Tap the location card for navigation.`;
-    else if(q.toLowerCase().includes("near")||q.toLowerCase().includes("facility")) reply="I can search the campus directory for classrooms, labs, offices and facilities. Try a specific name.";
-    else reply="I couldn't find that place in the campus directory. Try the building, room number, or facility name.";
-    setTimeout(()=>this.addChat("bot",reply),250);
+  addChat(who,msg,html=false){$("#chat").insertAdjacentHTML("beforeend",`<div class="bubble ${who}">${html?msg:this.escape(msg)}</div>`);$("#chat").scrollTop=$("#chat").scrollHeight;},
+  findIndoorMapForQuestion(q){
+    const text=(q||'').toLowerCase();
+    const maps=Array.isArray(this.indoorMaps)?this.indoorMaps:[];
+    // Prefer a place whose name/room/building/floor matches the question.
+    const found=this.places.find(p=>[p.name,p.room,p.building,p.floor].filter(Boolean).some(v=>text.includes(String(v).toLowerCase())));
+    if(found){
+      const m=maps.find(x=>x.building===found.building && x.floor===found.floor) || maps.find(x=>x.building===found.building);
+      return {place:found,map:m||null};
+    }
+    for(const m of maps){
+      if(text.includes(String(m.building||'').toLowerCase())||text.includes(String(m.floor||'').toLowerCase()))return {place:null,map:m};
+    }
+    return {place:null,map:null};
+  },
+  async askAssistant(){
+    const input=$("#chatInput"), q=input.value.trim(); if(!q)return; input.value='';
+    this.addChat('user',q);
+    this.addChat('bot','Analyzing the campus information and relevant indoor map…');
+    try{
+      const ctx=this.findIndoorMapForQuestion(q);
+      const payload={question:q,place:ctx.place?{name:ctx.place.name,building:ctx.place.building,floor:ctx.place.floor,room:ctx.place.room,description:ctx.place.description}:null,map:ctx.map?{building:ctx.map.building,floor:ctx.map.floor,title:ctx.map.title,note:ctx.map.note,image:ctx.map.image}:null};
+      const res=await fetch('/api/indoor-ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const data=await res.json();
+      $("#chat").lastElementChild?.remove();
+      if(data.ok){
+        const safe=this.escape(data.answer||'I could not determine the location.');
+        this.addChat('bot',safe);
+        if(data.map?.image){
+          const wrap=`<div class="ai-map-result"><b>${this.escape(data.map.building)} · ${this.escape(data.map.floor)}</b><img src="${data.map.image}" alt="Relevant indoor floor map"><small>${this.escape(data.map.highlight||'Relevant floor map')}</small></div>`;
+          $("#chat").insertAdjacentHTML('beforeend',wrap);
+          $("#chat").scrollTop=$("#chat").scrollHeight;
+        }
+      }else throw new Error(data.error||'AI service unavailable');
+    }catch(e){
+      $("#chat").lastElementChild?.remove();
+      const ctx=this.findIndoorMapForQuestion(q), p=ctx.place;
+      if(p){
+        this.addChat('bot',`${p.name} is in ${p.building}, ${p.floor}${p.room?' ('+p.room+')':''}. The relevant indoor map is shown in the Indoor Maps section.`);
+      }else{
+        this.addChat('bot','I could not analyze that request right now. Try a room name such as “LH-01”, a lab name, or a building/floor.');
+      }
+      console.warn('Indoor AI fallback:',e);
+    }
   },
 
   initAnalyticsConsent(){
