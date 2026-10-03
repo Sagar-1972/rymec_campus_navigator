@@ -761,7 +761,17 @@ async init() {
         const safe=this.escape(data.answer||'I could not determine the location.');
         this.addChat('bot',safe);
         if(data.map?.image){
-          const wrap=`<div class="ai-map-result"><b>${this.escape(data.map.building)} · ${this.escape(data.map.floor)}</b><img src="${data.map.image}" alt="Relevant indoor floor map"><small>${this.escape(data.map.highlight||'Relevant floor map')}</small></div>`;
+          const loc=data.map.location||null;
+          let overlay='';
+          if(loc && Number.isFinite(Number(loc.x)) && Number.isFinite(Number(loc.y))){
+            const x=Math.max(0,Math.min(100,Number(loc.x)/10));
+            const y=Math.max(0,Math.min(100,Number(loc.y)/10));
+            const w=Math.max(1,Math.min(100-x,Number(loc.width||60)/10));
+            const h=Math.max(1,Math.min(100-y,Number(loc.height||60)/10));
+            const label=this.escape(loc.label||'Location');
+            overlay=`<div class="ai-map-highlight" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%;"><span>${label}</span></div>`;
+          }
+          const wrap=`<div class="ai-map-result"><b>${this.escape(data.map.building)} · ${this.escape(data.map.floor)}</b><div class="ai-map-stage"><img src="${data.map.image}" alt="Relevant indoor floor map">${overlay}</div><small>${this.escape(data.map.highlight||'Relevant floor map')}${loc?.confidence?` · Highlight confidence: ${this.escape(loc.confidence)}`:''}</small></div>`;
           $("#chat").insertAdjacentHTML('beforeend',wrap);
           $("#chat").scrollTop=$("#chat").scrollHeight;
         }
