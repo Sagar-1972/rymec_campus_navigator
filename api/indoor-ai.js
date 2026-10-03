@@ -20,7 +20,7 @@ export default async function handler(req,res){
     const img=parseDataImage(map?.image);
     if(img) parts.push({inline_data:{mime_type:img.mimeType,data:img.data}});
 
-    const model=process.env.GEMINI_MODEL||'gemini-2.5-flash-lite';
+    const model=process.env.GEMINI_MODEL||'gemini-3.5-flash-lite';
     const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
     const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{temperature:0.2,maxOutputTokens:500}})});
     const data=await r.json();
