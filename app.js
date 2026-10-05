@@ -1159,4 +1159,3 @@ async init() {
 };
 
 document.addEventListener("DOMContentLoaded",()=>app.init());
-
