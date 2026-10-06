@@ -365,7 +365,12 @@ async init() {
     if(!p) return null;
     const rawBuilding=String(p.building||"").trim();
     const builtIn=BUILDING_GUIDES[rawBuilding] || BUILDING_GUIDES[rawBuilding.replace(/^(Main )?CSE$/i,"CSE Block")];
+    const directMapId=String(p.indoorMapId||"").trim();
+    const directMap=(Array.isArray(this.indoorMaps)?this.indoorMaps:[]).find(m=>String(m?.id||"")===directMapId && this.normalizeIndoorValue(m?.building)===this.normalizeIndoorValue(rawBuilding) && this.normalizeIndoorValue(m?.floor)===this.normalizeIndoorValue(p.floor||""));
     const adminMaps=this.findAdminIndoorMaps(rawBuilding);
+    if(directMap?.image){
+      return {title:rawBuilding,floors:[directMap.floor],maps:{[directMap.floor]:directMap.image},image:directMap.image,note:directMap.note||"Indoor floor map linked to this location.",source:directMap.source||"Location indoor map"};
+    }
     if(!builtIn && !adminMaps.length) return null;
 
     // Admin-uploaded maps are authoritative for the matching building/floor.
@@ -1120,6 +1125,13 @@ async init() {
       <label>FLOOR<input id="f_floor" value="${this.escapeAttr(p.floor)}"></label>
       <label>ROOM<input id="f_room" value="${this.escapeAttr(p.room)}"></label>
     </div>
+    <div style="margin-top:14px;padding:14px;border:1px solid #dbe4ee;border-radius:12px;background:#f8fafc">
+      <label style="display:block;font-weight:800;font-size:11px;color:#475569">INDOOR MAP FOR THIS LOCATION
+        <input id="f_indoor_map" type="file" accept="image/png,image/jpeg,image/webp" style="display:block;width:100%;margin-top:7px;padding:9px;border:1px solid #cbd5e1;border-radius:9px;background:#fff;box-sizing:border-box">
+      </label>
+      <small style="display:block;margin-top:6px;color:#64748b">Optional. Upload the floor plan here while adding/editing this location. The map will be linked directly to this location.</small>
+      ${p.indoorMapId?`<small style="display:block;margin-top:6px;color:#166534;font-weight:700">✓ An indoor map is already linked to this location. Choose a new image to replace it.</small>`:""}
+    </div>
     <div class="coordinate-panel">
       <div class="coordinate-title"><span>📍 Exact location</span><small>Choose coordinates without typing them manually</small></div>
       <div class="coordinate-fields"><label>LATITUDE<input id="f_lat" inputmode="decimal" value="${this.escapeAttr(p.lat)}"></label><label>LONGITUDE<input id="f_lng" inputmode="decimal" value="${this.escapeAttr(p.lng)}"></label></div>
@@ -1171,11 +1183,40 @@ async init() {
     setTimeout(()=>map.invalidateSize(),80);
   },
   async savePlace(id,modal){
+    const oldPlace=this.places.find(x=>x.id===id)||null;
     const p={id};["name","category","description","building","floor","room"].forEach(k=>p[k]=$("#f_"+k).value.trim());
     p.lat=parseFloat($("#f_lat").value);p.lng=parseFloat($("#f_lng").value);
     if(!p.name||!Number.isFinite(p.lat)||!Number.isFinite(p.lng)){this.toast("Name and valid coordinates are required.");return;}
+
+    const indoorFile=modal.querySelector("#f_indoor_map")?.files?.[0]||null;
+    if(indoorFile && (!p.building || !p.floor)){
+      this.toast("Enter the building and floor before uploading an indoor map.");
+      return;
+    }
+
+    // Keep an existing direct link when editing unless the building/floor changed.
+    if(oldPlace?.indoorMapId && oldPlace.building===p.building && oldPlace.floor===p.floor) p.indoorMapId=oldPlace.indoorMapId;
+
+    if(indoorFile){
+      try{
+        this.toast("Preparing indoor map…");
+        const image=await this.optimizeIndoorImage(indoorFile);
+        const mapId=oldPlace?.indoorMapId || `im_${Date.now()}`;
+        const mapPayload={id:mapId,building:p.building,floor:p.floor,title:p.building,source:`${p.name} — uploaded while adding location`,image,note:`Indoor floor map for ${p.floor}.`};
+        const mapSaved=await this.saveIndoorMap(mapPayload);
+        if(!mapSaved){this.toast("Location not saved because the indoor map could not be synced.");return;}
+        p.indoorMapId=mapId;
+      }catch(e){console.error(e);this.toast(e?.message||"Unable to prepare the indoor map.");return;}
+    }
+
     const i=this.places.findIndex(x=>x.id===id); if(i>=0)this.places[i]=p;else this.places.push(p);
-    const synced=await this.save();if(!synced){this.toast("Location was not synced. Check admin login and Vercel storage, then save again.");return;}modal.remove();this.renderAdmin();this.renderMarkers();this.render3DMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();this.toast("Location saved and synced.");
+    const synced=await this.save();
+    if(!synced){
+      if(i>=0 && oldPlace) this.places[i]=oldPlace; else this.places=this.places.filter(x=>x.id!==id);
+      this.toast("Location was not synced. Check admin login and Vercel storage, then save again.");
+      return;
+    }
+    modal.remove();this.renderAdmin();this.renderMarkers();this.render3DMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();this.toast(indoorFile?"Location and indoor map saved and synced.":"Location saved and synced.");
   },
   async deletePlace(id){if(confirm("Delete this location?")){this.places=this.places.filter(p=>p.id!==id);await this.save();this.renderAdmin();this.renderMarkers();this.render3DMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();}},
   async resetData(){if(confirm("Reset all locations to demo data?")){this.places=[...DEFAULT_PLACES];await this.save();location.reload();}},
