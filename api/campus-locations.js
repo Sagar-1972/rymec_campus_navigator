@@ -15,7 +15,7 @@ function validToken(token) {
     const [ts, sig] = String(token || '').split('.');
     if (!ts || !sig || !process.env.ADMIN_PASSWORD) return false;
     const age = Date.now() - Number(ts);
-    if (!Number.isFinite(age) || age < 0 || age > 12 * 60 * 60 * 1000) return false;
+    if (!Number.isFinite(age) || age < 0 || age > 4 * 60 * 60 * 1000) return false;
     const expected = crypto.createHmac('sha256', process.env.ADMIN_PASSWORD).update(ts).digest('hex');
     const a = Buffer.from(sig);
     const b = Buffer.from(expected);

@@ -48,6 +48,7 @@ const app = {
   navigationSteps: [],
   navigationStepIndex: 0,
   userAccuracyCircle: null,
+  darkMode: false,
   lastHeading: 0,
   lastRerouteAt: 0,
   arrivalStableCount: 0,
@@ -66,6 +67,7 @@ async init() {
     await this.loadPlacesFromServer();
     await this.loadRoutesFromServer();
     await this.loadIndoorMapsFromServer();
+    this.initDarkMode();
     document.title = CAMPUS_CONFIG.name + " | Campus Navigator";
     $("#brandName").textContent = CAMPUS_CONFIG.shortName;
     this.renderPopular();
@@ -1224,6 +1226,17 @@ async init() {
   importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d))throw 0;this.places=d;this.save();this.renderAdmin();this.renderMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();this.toast("Locations imported.");}catch{this.toast("Invalid JSON file.");}};r.readAsText(f);},
   install(){if(this.deferredInstall){this.deferredInstall.prompt();this.deferredInstall=null;}},
   registerPWA(){if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});},
+initDarkMode(){
+  const stored = localStorage.getItem("darkMode");
+  const dark = stored === "true";
+  document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  this.darkMode = dark;
+},
+toggleDarkMode(){
+  this.darkMode = !this.darkMode;
+  localStorage.setItem("darkMode", this.darkMode);
+  document.documentElement.setAttribute("data-theme", this.darkMode ? "dark" : "light");
+},
   icon(cat){return ({Laboratory:"🧪",Classroom:"🏫",Office:"👨‍💼",Facility:"⭐",Building:"🏢"})[cat]||"📍";},
   escape(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));},
   escapeAttr(s){return this.escape(s).replace(/`/g,"&#96;");},

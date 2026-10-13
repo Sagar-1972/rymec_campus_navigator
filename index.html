@@ -19,11 +19,58 @@
   <meta name="twitter:image" content="https://rymec-campus-navigator.vercel.app/media/social-preview.jpg">
   <link rel="icon" href="media/favicon.png" type="image/png">
   <link rel="apple-touch-icon" href="media/favicon.png">
+  <link rel="manifest" href="manifest.json">
   
   
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
   <style>
-*{box-sizing:border-box}html,body{margin:0;padding:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6f8fc;color:#111827}body{padding-bottom:78px}.topbar{height:72px;background:#0f172a;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 max(18px,calc((100% - 1180px)/2));position:sticky;top:0;z-index:1000}.brand{display:flex;align-items:center;gap:11px;cursor:pointer}.brand-mark{width:40px;height:40px;border-radius:12px;object-fit:cover;background:#fff;padding:3px;display:block}.campus-media{margin:30px 0}.media-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.media-card{background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;cursor:pointer}.media-card img,.media-card video{width:100%;height:190px;object-fit:cover;display:block}.media-card-body{padding:12px 14px}.media-card-body b{display:block;font-size:14px}.media-card-body span{display:block;color:#64748b;font-size:12px;margin-top:4px;line-height:1.4}.media-gallery{margin:18px 0}.media-gallery h3{margin:0 0 10px;font-size:18px}.gallery-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.gallery-grid figure{margin:0;background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden}.gallery-grid img,.gallery-grid video{width:100%;height:220px;object-fit:cover;display:block}.gallery-grid figcaption{padding:9px 11px;font-size:11px;color:#64748b}.video-badge{position:relative}.video-badge:after{content:"▶ Video";position:absolute;left:10px;top:10px;background:#0f172acc;color:#fff;border-radius:999px;padding:5px 8px;font-size:10px;font-weight:800}.college-photo{width:100%;height:220px;object-fit:cover;border-radius:18px;margin:14px 0 0}.detail-actions{flex-wrap:wrap}@media(max-width:760px){.media-grid{grid-template-columns:1fr 1fr}.media-card img,.media-card video{height:150px}.gallery-grid{grid-template-columns:1fr}.gallery-grid img,.gallery-grid video{height:210px}}.brand strong{display:block;font-size:15px}.brand small{display:block;color:#94a3b8;font-size:11px;margin-top:2px}.top-actions{display:flex;gap:7px}.icon-btn{border:0;background:#1e293b;color:#e2e8f0;border-radius:10px;width:40px;height:40px;font-size:19px;cursor:pointer}.page{display:none;max-width:1180px;margin:auto;padding:28px 18px}.page.active{display:block}
+:root {
+  --bg-primary: #f6f8fc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #eff6ff;
+  --text-primary: #111827;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --accent-primary: #0f172a;
+  --accent-secondary: #1e293b;
+  --accent-brand: #2563eb;
+  --accent-brand-hover: #1d4ed8;
+  --border-color: #e2e8f0;
+  --border-focus: #38bdf8;
+  --shadow-sm: 0 2px 8px rgba(15,23,42,0.08);
+  --shadow-md: 0 8px 25px rgba(15,23,42,0.12);
+  --shadow-lg: 0 20px 40px rgba(15,23,42,0.15);
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --danger-bg: #fef2f2;
+  --info: #38bdf8;
+}
+
+[data-theme="dark"] {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #1e293b;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent-primary: #f1f5f9;
+  --accent-secondary: #334155;
+  --accent-brand: #3b82f6;
+  --accent-brand-hover: #60a5fa;
+  --border-color: #334155;
+  --border-focus: #38bdf8;
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
+  --shadow-md: 0 8px 25px rgba(0,0,0,0.4);
+  --shadow-lg: 0 20px 40px rgba(0,0,0,0.5);
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --danger-bg: #450a0a;
+  --info: #7dd3fc;
+}
+
+*{box-sizing:border-box}html,body{margin:0;padding:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg-primary);color:var(--text-primary)}body{padding-bottom:78px}.topbar{height:72px;background:#0f172a;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 max(18px,calc((100% - 1180px)/2));position:sticky;top:0;z-index:1000}.brand{display:flex;align-items:center;gap:11px;cursor:pointer}.brand-mark{width:40px;height:40px;border-radius:12px;object-fit:cover;background:#fff;padding:3px;display:block}.campus-media{margin:30px 0}.media-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.media-card{background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;cursor:pointer}.media-card img,.media-card video{width:100%;height:190px;object-fit:cover;display:block}.media-card-body{padding:12px 14px}.media-card-body b{display:block;font-size:14px}.media-card-body span{display:block;color:#64748b;font-size:12px;margin-top:4px;line-height:1.4}.media-gallery{margin:18px 0}.media-gallery h3{margin:0 0 10px;font-size:18px}.gallery-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.gallery-grid figure{margin:0;background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden}.gallery-grid img,.gallery-grid video{width:100%;height:220px;object-fit:cover;display:block}.gallery-grid figcaption{padding:9px 11px;font-size:11px;color:#64748b}.video-badge{position:relative}.video-badge:after{content:"▶ Video";position:absolute;left:10px;top:10px;background:#0f172acc;color:#fff;border-radius:999px;padding:5px 8px;font-size:10px;font-weight:800}.college-photo{width:100%;height:220px;object-fit:cover;border-radius:18px;margin:14px 0 0}.detail-actions{flex-wrap:wrap}@media(max-width:760px){.media-grid{grid-template-columns:1fr 1fr}.media-card img,.media-card video{height:150px}.gallery-grid{grid-template-columns:1fr}.gallery-grid img,.gallery-grid video{height:210px}}.brand strong{display:block;font-size:15px}.brand small{display:block;color:#94a3b8;font-size:11px;margin-top:2px}.top-actions{display:flex;gap:7px}.icon-btn{border:0;background:#1e293b;color:#e2e8f0;border-radius:10px;width:40px;height:40px;font-size:19px;cursor:pointer}.page{display:none;max-width:1180px;margin:auto;padding:28px 18px}.page.active{display:block}
 .hero-aerial{position:relative;min-height:calc(100vh - 72px);padding:0!important;isolation:isolate;background:#07111f;overflow:hidden;box-shadow:none;border-radius:0}
 .hero-aerial-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-3;filter:saturate(1.04) contrast(1.02);transform:scale(1.01)}
 .hero-aerial-overlay{position:absolute;inset:0;z-index:-2;background:linear-gradient(90deg,#020617d9 0%,#0206179e 38%,#02061725 72%,#02061710 100%),linear-gradient(0deg,#020617a8,#02061708 60%)}
@@ -111,6 +158,7 @@
     <div class="top-actions">
       <button class="icon-btn" title="Install app" id="installBtn" hidden>⇩</button>
       <button class="icon-btn" title="My location" onclick="app.locate()">⌖</button>
+      <button class="icon-btn" title="Toggle Dark Mode" id="darkModeToggle" onclick="app.toggleDarkMode()">🌙</button>
       <button class="icon-btn" title="Admin" onclick="app.openAdmin()">⚙</button>
     </div>
   </header>
@@ -174,7 +222,7 @@
         <div class="section-head"><h2>Campus Views</h2><span class="eyebrow">REAL CAMPUS FOOTAGE</span></div>
         <div class="media-grid">
           <article class="media-card video-badge" onclick="app.openCampusMedia('aerial')">
-            <img src="media/aerial-campus.jpg" alt="Aerial campus view" loading="eager" decoding="async">
+            <img src="media/aerial-campus.jpg" alt="Aerial campus view" loading="lazy" decoding="async">
             <div class="media-card-body"><b>Aerial Campus View</b><span>Explore the campus layout from above.</span></div>
           </article>
           <article class="media-card video-badge" onclick="app.openCampusMedia('main')">
