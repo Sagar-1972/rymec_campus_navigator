@@ -39,6 +39,7 @@ const app = {
   routeLine: null,
   routePassedLine: null,
   navigationStarted: false,
+  navigationPaused: false,
   campusRouteLayer: null,
   deferredInstall: null,
   currentLocation: null,
@@ -513,14 +514,26 @@ async init() {
   },
 
   startNavigation(p) {
+    // A fresh start always creates a new route. Resume uses resumeNavigation()
+    // and therefore does not call this method.
     this.stopNavigation(false);
-    this.navigationDestination=p;
-    this.navigationDestination._arrived=false;
-    this.arrivalStableCount=0;
-    this.lastArrivalDistance=Infinity;
-    this.navigationStarted=true;
-    this.showNavigationLoading(p);
-    if(this.currentLocation) this.buildRoute(p,true); else this.locate(()=>this.buildRoute(p,true));
+    this.navigationDestination = p || this.navigationDestination;
+    if (!this.navigationDestination) return;
+    this.navigationDestination._arrived = false;
+    this.arrivalStableCount = 0;
+    this.lastArrivalDistance = Infinity;
+    this.navigationPaused = false;
+    this.navigationStarted = true;
+    this.showNavigationLoading(this.navigationDestination);
+    if (this.currentLocation) {
+      this.buildRoute(this.navigationDestination, true);
+    } else {
+      this.locate(() => {
+        if (this.navigationStarted && !this.navigationPaused) {
+          this.buildRoute(this.navigationDestination, true);
+        }
+      });
+    }
   },
 
   showNavigationReady(p){
@@ -530,15 +543,53 @@ async init() {
     $("#routePanel").innerHTML=`<div class="nav-direction"><div class="nav-turn">🧭</div><div class="nav-copy"><strong>Navigate to ${this.escape(p.name)}</strong><small>${guide?`${this.escape(p.building)} · ${this.escape(p.floor||"Floor not specified")} — outdoor route first, then use the indoor guide.`:"Press Start Navigation to use live GPS."}</small></div></div><div class="nav-actions"><button type="button" class="primary-btn" onclick="app.startNavigation(app.navigationDestination)">▶ Start Navigation</button>${guide?`<button type="button" class="secondary-btn" onclick="app.openIndoorGuide('${this.escapeAttr(p.building)}','${this.escapeAttr(p.floor)}')">🏢 Indoor Guide</button>`:""}<button type="button" class="secondary-btn nav-stop-btn" onclick="app.stopNavigation(true)">⏹ Stop</button></div>`;
   },
 
-  stopNavigation(clearPanel=true) {
-    if(this.navigationWatchId!==null){navigator.geolocation.clearWatch(this.navigationWatchId);this.navigationWatchId=null;}
-    this.navigationStarted=false;
-    this.navigationRoute=null;
-    this.navigationSteps=[];
-    this.navigationStepIndex=0;
+  pauseNavigation() {
+    if (!this.navigationStarted || this.navigationPaused) return;
+    this.navigationPaused = true;
+    if (this.navigationWatchId !== null) {
+      navigator.geolocation.clearWatch(this.navigationWatchId);
+      this.navigationWatchId = null;
+    }
+    // Keep destination, route geometry, passed route line, progress and step index.
+    this.updateNavigationInstruction();
+    this.toast("Navigation paused. Your route and progress are saved.");
+  },
+
+  resumeNavigation() {
+    if (!this.navigationPaused || !this.navigationDestination) return;
+    this.navigationPaused = false;
+    this.navigationStarted = true;
+    this.startWatchingLocation();
+    this.updateNavigationInstruction();
+    this.toast("Navigation resumed.");
+  },
+
+  stopNavigation(clearPanel=true, returnToReady=false) {
+    if (this.navigationWatchId !== null) {
+      navigator.geolocation.clearWatch(this.navigationWatchId);
+      this.navigationWatchId = null;
+    }
+    this.navigationStarted = false;
+    this.navigationPaused = false;
+    this.navigationRoute = null;
+    this.navigationSteps = [];
+    this.navigationStepIndex = 0;
+    this.arrivalStableCount = 0;
+    this.lastArrivalDistance = Infinity;
     this.clearNavigationLayers();
-    if(clearPanel){const panel=$("#routePanel");if(panel){panel.hidden=true;panel.classList.remove('nav-arrived');}}
-    else if(this.navigationDestination) this.showNavigationReady(this.navigationDestination);
+
+    // Stop returns to the selected destination's ready screen, so the user can
+    // start the same destination again or choose another one.
+    if (this.navigationDestination) this.navigationDestination._arrived = false;
+    if (returnToReady && this.navigationDestination) {
+      this.showNavigationReady(this.navigationDestination);
+    } else if (clearPanel) {
+      const panel = $("#routePanel");
+      if (panel) {
+        panel.hidden = true;
+        panel.classList.remove("nav-arrived");
+      }
+    }
   },
 
   clearNavigationLayers(){
@@ -570,48 +621,67 @@ async init() {
   },
 
   updateUserLocation(pos){
-    this.previousLocation=this.currentLocation;
-    this.currentLocation=[pos.coords.latitude,pos.coords.longitude];
+    // Ignore any queued GPS callback after Pause; retain the last known position.
+    if (this.navigationPaused) return;
+
+    this.previousLocation = this.currentLocation;
+    this.currentLocation = [pos.coords.latitude, pos.coords.longitude];
     this.ensureUserMarker();
     this.userMarker.setLatLng(this.currentLocation);
     this.updateUserHeading(pos);
-    const accuracy=Math.max(5,Number(pos.coords.accuracy||20));
-    if(!this.userAccuracyCircle){
-      this.userAccuracyCircle=L.circle(this.currentLocation,{radius:accuracy,className:"accuracy-circle",interactive:false}).addTo(this.map);
+    const accuracy = Math.max(5, Number(pos.coords.accuracy || 20));
+    if (!this.userAccuracyCircle) {
+      this.userAccuracyCircle = L.circle(this.currentLocation, {
+        radius: accuracy, className: "accuracy-circle", interactive: false
+      }).addTo(this.map);
     } else {
       this.userAccuracyCircle.setLatLng(this.currentLocation).setRadius(accuracy);
     }
-    if(this.navigationDestination && this.navigationRoute){
-      const distance=this.map.distance(this.currentLocation,[this.navigationDestination.lat,this.navigationDestination.lng]);
-      const accuracy=Math.max(5,Number(pos.coords.accuracy||20));
-      // GPS can report a position several metres away from the real user. Do not
-      // declare arrival from one noisy reading. Require a small, accuracy-aware
-      // radius and two consecutive good readings.
-      const arrivalRadius=Math.min(18,Math.max(6,Math.min(accuracy*0.55,12)));
-      if(distance<=arrivalRadius){
-        this.arrivalStableCount=(this.lastArrivalDistance<Infinity && distance<=this.lastArrivalDistance+2) ? this.arrivalStableCount+1 : 1;
-        if(this.arrivalStableCount>=2){this.reachedDestination(distance);return;}
-      }else{this.arrivalStableCount=0;}
-      this.lastArrivalDistance=distance;
-      const nearest=this.nearestRouteIndex(this.currentLocation);
-      if(nearest>=0){
-        const nearestCoord=this.navigationRoute.geometry.coordinates[nearest];
-        const offRoute=this.map.distance(this.currentLocation,[nearestCoord[1],nearestCoord[0]]);
-        const offRouteLimit=Math.max(45,Math.min(75,Number(pos.coords.accuracy||20)*2.5));
-        if(offRoute>offRouteLimit && Date.now()-this.lastRerouteAt>12000){
-          this.lastRerouteAt=Date.now();
-          this.buildRoute(this.navigationDestination,true);
+
+    if (this.navigationDestination && this.navigationRoute && this.navigationStarted) {
+      const distance = this.map.distance(
+        this.currentLocation,
+        [this.navigationDestination.lat, this.navigationDestination.lng]
+      );
+      const arrivalRadius = Math.min(18, Math.max(6, Math.min(accuracy * 0.55, 12)));
+      if (distance <= arrivalRadius) {
+        this.arrivalStableCount =
+          (this.lastArrivalDistance < Infinity && distance <= this.lastArrivalDistance + 2)
+            ? this.arrivalStableCount + 1 : 1;
+        if (this.arrivalStableCount >= 2) {
+          this.reachedDestination(distance);
+          return;
+        }
+      } else {
+        this.arrivalStableCount = 0;
+      }
+      this.lastArrivalDistance = distance;
+
+      const nearest = this.nearestRouteIndex(this.currentLocation);
+      if (nearest >= 0) {
+        const nearestCoord = this.navigationRoute.geometry.coordinates[nearest];
+        const offRoute = this.map.distance(
+          this.currentLocation, [nearestCoord[1], nearestCoord[0]]
+        );
+        const offRouteLimit = Math.max(45, Math.min(75, Number(pos.coords.accuracy || 20) * 2.5));
+        if (offRoute > offRouteLimit && Date.now() - this.lastRerouteAt > 12000) {
+          this.lastRerouteAt = Date.now();
+          this.buildRoute(this.navigationDestination, true);
           return;
         }
       }
-      const total=this.navigationRoute.geometry.coordinates.length;
-      if(nearest>=0 && total>1){
-        const progress=Math.max(0,Math.min(100,(nearest/(total-1))*100));
-        const bar=$("#navProgress"); if(bar)bar.style.width=progress+"%";
+
+      const total = this.navigationRoute.geometry.coordinates.length;
+      if (nearest >= 0 && total > 1) {
+        const progress = Math.max(0, Math.min(100, (nearest / (total - 1)) * 100));
+        const bar = $("#navProgress");
+        if (bar) bar.style.width = progress + "%";
         this.updateMovingRouteLine(nearest);
       }
       this.updateNavigationInstruction();
-      if(this.map.getBounds().contains(this.currentLocation)===false){this.map.setView(this.currentLocation,Math.max(this.map.getZoom(),18),{animate:true});}
+      if (this.map.getBounds().contains(this.currentLocation) === false) {
+        this.map.setView(this.currentLocation, Math.max(this.map.getZoom(), 18), { animate: true });
+      }
     }
   },
 
@@ -631,8 +701,15 @@ async init() {
   },
 
   startWatchingLocation(){
-    if(!navigator.geolocation || this.navigationWatchId!==null)return;
-    this.navigationWatchId=navigator.geolocation.watchPosition(pos=>this.updateUserLocation(pos),()=>this.toast("Live location updates are unavailable. Check location permission."),{enableHighAccuracy:true,maximumAge:2000,timeout:10000});
+    if (!this.navigationStarted || this.navigationPaused || !navigator.geolocation ||
+        this.navigationWatchId !== null) return;
+    this.navigationWatchId = navigator.geolocation.watchPosition(
+      pos => {
+        if (!this.navigationPaused && this.navigationStarted) this.updateUserLocation(pos);
+      },
+      () => this.toast("Live location updates are unavailable. Check location permission."),
+      { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
+    );
   },
 
   bearingBetween(lat1,lng1,lat2,lng2){
@@ -669,28 +746,54 @@ async init() {
   },
 
   updateNavigationInstruction(){
-    if(!this.navigationSteps.length || !this.navigationRoute)return;
-    const idx=this.nearestRouteIndex(this.currentLocation);
-    let next=this.navigationStepIndex;
-    while(next<this.navigationSteps.length-1){
-      const step=this.navigationSteps[next];
-      const end=step.maneuver?.location;
-      if(!end)break;
-      const d=this.map.distance(this.currentLocation,[end[1],end[0]]);
-      if(d<18) next++; else break;
+    if (!this.navigationSteps.length || !this.navigationRoute || !this.currentLocation) return;
+
+    const nextLocation = this.currentLocation;
+    let next = this.navigationStepIndex;
+    while (next < this.navigationSteps.length - 1) {
+      const step = this.navigationSteps[next];
+      const end = step.maneuver?.location;
+      if (!end) break;
+      const d = this.map.distance(nextLocation, [end[1], end[0]]);
+      if (d < 18) next++;
+      else break;
     }
-    this.navigationStepIndex=next;
-    const step=this.navigationSteps[next];
-    const end=step.maneuver?.location;
-    const d=end?this.map.distance(this.currentLocation,[end[1],end[0]]):0;
-    const icon=({left:'↰',right:'↱',straight:'↑',slight_left:'↖',slight_right:'↗',sharp_left:'↙',sharp_right:'↘',uturn:'↶'}[step.maneuver?.modifier]||'↑');
-    const text=this.formatStep(step);
-    const distanceText=d<1000 ? `${Math.round(d)} m` : `${(d/1000).toFixed(1)} km`;
-    const total=this.navigationSteps.length;
-    $("#routePanel").hidden=false;
-    $("#routePanel").innerHTML=`<div class="nav-direction"><div class="nav-turn">${icon}</div><div class="nav-copy"><strong>${this.escape(text)}</strong><small>${distanceText} · Step ${Math.min(next+1,total)} of ${total}</small></div></div><div class="nav-progress"><i id="navProgress"></i></div><div class="nav-actions"><button type="button" class="secondary-btn nav-stop-btn" onclick="app.stopNavigation(true)">⏹ Stop Navigation</button></div>`;
-    const nearest=this.nearestRouteIndex(this.currentLocation);
-    if(nearest>=0 && this.navigationRoute.geometry.coordinates.length>1){$("#navProgress").style.width=(nearest/(this.navigationRoute.geometry.coordinates.length-1)*100)+"%";}
+    this.navigationStepIndex = next;
+
+    const step = this.navigationSteps[next];
+    const end = step.maneuver?.location;
+    const d = end ? this.map.distance(nextLocation, [end[1], end[0]]) : 0;
+    const icon = ({
+      left: "↰", right: "↱", straight: "↑", slight_left: "↖",
+      slight_right: "↗", sharp_left: "↙", sharp_right: "↘", uturn: "↶"
+    }[step.maneuver?.modifier] || "↑");
+    const text = this.formatStep(step);
+    const distanceText = d < 1000 ? `${Math.round(d)} m` : `${(d / 1000).toFixed(1)} km`;
+    const total = this.navigationSteps.length;
+
+    $("#routePanel").hidden = false;
+    $("#routePanel").classList.remove("nav-arrived");
+    $("#routePanel").innerHTML = `
+      <div class="nav-direction">
+        <div class="nav-turn">${this.navigationPaused ? "Ⅱ" : icon}</div>
+        <div class="nav-copy">
+          <strong>${this.navigationPaused ? "Navigation paused" : this.escape(text)}</strong>
+          <small>${distanceText} · Step ${Math.min(next + 1, total)} of ${total}</small>
+        </div>
+      </div>
+      <div class="nav-progress"><i id="navProgress"></i></div>
+      <div class="nav-actions">
+        ${this.navigationPaused
+          ? '<button type="button" class="primary-btn" onclick="app.resumeNavigation()">▶ Resume</button>'
+          : '<button type="button" class="secondary-btn" onclick="app.pauseNavigation()">Ⅱ Pause</button>'}
+        <button type="button" class="secondary-btn nav-stop-btn" onclick="app.stopNavigation(true,true)">⏹ Stop Navigation</button>
+      </div>`;
+
+    const nearest = this.nearestRouteIndex(this.currentLocation);
+    if (nearest >= 0 && this.navigationRoute.geometry.coordinates.length > 1) {
+      $("#navProgress").style.width =
+        (nearest / (this.navigationRoute.geometry.coordinates.length - 1) * 100) + "%";
+    }
   },
 
   reachedDestination(distance){
