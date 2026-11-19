@@ -621,60 +621,85 @@ async init() {
   },
 
   updateUserLocation(pos){
-    projectOntoSegment(p, a, b){
-    const latRef=a[0]*Math.PI/180;
-    const kx=111320*Math.cos(latRef);
-    const ky=110540;
-    const ax=0, ay=0;
-    const bx=(b[1]-a[1])*kx, by=(b[0]-a[0])*ky;
-    const px=(p[1]-a[1])*kx, py=(p[0]-a[0])*ky;
-    const dx=bx-ax, dy=by-ay;
-    const lenSq=dx*dx+dy*dy;
-    let t=lenSq>0?((px-ax)*dx+(py-ay)*dy)/lenSq:0;
-    t=Math.max(0,Math.min(1,t));
-    const qLat=a[0]+t*(b[0]-a[0]);
-    const qLng=a[1]+t*(b[1]-a[1]);
-    return {lat:qLat,lng:qLng,t,dist:this.map.distance(p,[qLat,qLng])};
-  },
+    // Ignore any queued GPS callback after Pause; retain the last known position.
+    if (this.navigationPaused) return;
 
-  nearestRouteIndex(loc){
-    if(!this.navigationRoute?.geometry?.coordinates?.length)return -1;
-    const coords=this.navigationRoute.geometry.coordinates;
-    if(coords.length===1)return 0;
-    let bestSeg=0, bestD=Infinity;
-    for(let i=0;i<coords.length-1;i++){
-      const a=[coords[i][1],coords[i][0]];
-      const b=[coords[i+1][1],coords[i+1][0]];
-      const proj=this.projectOntoSegment(loc,a,b);
-      if(proj.dist<bestD){bestD=proj.dist;bestSeg=i;}
+    this.previousLocation = this.currentLocation;
+    this.currentLocation = [pos.coords.latitude, pos.coords.longitude];
+    this.ensureUserMarker();
+    this.userMarker.setLatLng(this.currentLocation);
+    this.updateUserHeading(pos);
+    const accuracy = Math.max(5, Number(pos.coords.accuracy || 20));
+    if (!this.userAccuracyCircle) {
+      this.userAccuracyCircle = L.circle(this.currentLocation, {
+        radius: accuracy, className: "accuracy-circle", interactive: false
+      }).addTo(this.map);
+    } else {
+      this.userAccuracyCircle.setLatLng(this.currentLocation).setRadius(accuracy);
     }
-    return bestSeg;
+
+    if (this.navigationDestination && this.navigationRoute && this.navigationStarted) {
+      const distance = this.map.distance(
+        this.currentLocation,
+        [this.navigationDestination.lat, this.navigationDestination.lng]
+      );
+      const arrivalRadius = Math.min(18, Math.max(6, Math.min(accuracy * 0.55, 12)));
+      if (distance <= arrivalRadius) {
+        this.arrivalStableCount =
+          (this.lastArrivalDistance < Infinity && distance <= this.lastArrivalDistance + 2)
+            ? this.arrivalStableCount + 1 : 1;
+        if (this.arrivalStableCount >= 2) {
+          this.reachedDestination(distance);
+          return;
+        }
+      } else {
+        this.arrivalStableCount = 0;
+      }
+      this.lastArrivalDistance = distance;
+
+      const nearest = this.nearestRouteIndex(this.currentLocation);
+      if (nearest >= 0) {
+        const nearestCoord = this.navigationRoute.geometry.coordinates[nearest];
+        const offRoute = this.map.distance(
+          this.currentLocation, [nearestCoord[1], nearestCoord[0]]
+        );
+        const offRouteLimit = Math.max(45, Math.min(75, Number(pos.coords.accuracy || 20) * 2.5));
+        if (offRoute > offRouteLimit && Date.now() - this.lastRerouteAt > 12000) {
+          this.lastRerouteAt = Date.now();
+          this.buildRoute(this.navigationDestination, true);
+          return;
+        }
+      }
+
+      const total = this.navigationRoute.geometry.coordinates.length;
+      if (nearest >= 0 && total > 1) {
+        const progress = Math.max(0, Math.min(100, (nearest / (total - 1)) * 100));
+        const bar = $("#navProgress");
+        if (bar) bar.style.width = progress + "%";
+        this.updateMovingRouteLine(nearest);
+      }
+      this.updateNavigationInstruction();
+      if (this.map.getBounds().contains(this.currentLocation) === false) {
+        this.map.setView(this.currentLocation, Math.max(this.map.getZoom(), 18), { animate: true });
+      }
+    }
   },
 
   updateMovingRouteLine(nearestIndex){
-    if(!this.navigationRoute?.geometry?.coordinates?.length || !this.map || !this.currentLocation)return;
+    if(!this.navigationRoute?.geometry?.coordinates?.length || !this.map)return;
     const coords=this.navigationRoute.geometry.coordinates;
-    const seg=Math.max(0,Math.min(nearestIndex,coords.length-2));
-    const a=[coords[seg][1],coords[seg][0]];
-    const b=[coords[seg+1][1],coords[seg+1][0]];
-    const proj=this.projectOntoSegment(this.currentLocation,a,b);
-    const anchor=[proj.lat,proj.lng];
-
-    const remLatLngs=[anchor,...coords.slice(seg+1).map(c=>[c[1],c[0]])];
-    if(remLatLngs.length>=2){
-      if(this.routeLine)this.routeLine.setLatLngs(remLatLngs);
-      else this.routeLine=L.polyline(remLatLngs,{weight:7,color:'#2563eb',opacity:.95,lineCap:'round',lineJoin:'round'}).addTo(this.map);
-    }else if(this.routeLine){
-      this.routeLine.remove();
-      this.routeLine=null;
-    }
-
-    const passedLatLngs=[...coords.slice(0,seg+1).map(c=>[c[1],c[0]]),anchor];
-    if(passedLatLngs.length>=2){
-      if(this.routePassedLine)this.routePassedLine.setLatLngs(passedLatLngs);
-      else this.routePassedLine=L.polyline(passedLatLngs,{weight:7,color:'#94a3b8',opacity:.55,lineCap:'round',lineJoin:'round'}).addTo(this.map);
+    const start=Math.max(0,Math.min(nearestIndex,coords.length-1));
+    const remaining=[[this.currentLocation[1],this.currentLocation[0]],...coords.slice(start+1)];
+    if(this.routeLine)this.routeLine.setLatLngs(remaining.map(c=>[c[1],c[0]]));
+    else if(remaining.length>1)this.routeLine=L.polyline(remaining.map(c=>[c[1],c[0]]),{weight:7,color:'#2563eb',opacity:.95,lineCap:'round',lineJoin:'round'}).addTo(this.map);
+    const passed=coords.slice(0,start+1).map(c=>[c[1],c[0]]);
+    if(passed.length>1){
+      passed.push([this.currentLocation[0],this.currentLocation[1]]);
+      if(this.routePassedLine)this.routePassedLine.setLatLngs(passed);
+      else this.routePassedLine=L.polyline(passed,{weight:7,color:'#94a3b8',opacity:.55,lineCap:'round',lineJoin:'round'}).addTo(this.map);
     }
   },
+
   startWatchingLocation(){
     if (!this.navigationStarted || this.navigationPaused || !navigator.geolocation ||
         this.navigationWatchId !== null) return;
