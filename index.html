@@ -19,58 +19,11 @@
   <meta name="twitter:image" content="https://rymec-campus-navigator.vercel.app/media/social-preview.jpg">
   <link rel="icon" href="media/favicon.png" type="image/png">
   <link rel="apple-touch-icon" href="media/favicon.png">
-  <link rel="manifest" href="manifest.json">
   
   
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
   <style>
-:root {
-  --bg-primary: #f6f8fc;
-  --bg-secondary: #ffffff;
-  --bg-tertiary: #eff6ff;
-  --text-primary: #111827;
-  --text-secondary: #64748b;
-  --text-muted: #94a3b8;
-  --accent-primary: #0f172a;
-  --accent-secondary: #1e293b;
-  --accent-brand: #2563eb;
-  --accent-brand-hover: #1d4ed8;
-  --border-color: #e2e8f0;
-  --border-focus: #38bdf8;
-  --shadow-sm: 0 2px 8px rgba(15,23,42,0.08);
-  --shadow-md: 0 8px 25px rgba(15,23,42,0.12);
-  --shadow-lg: 0 20px 40px rgba(15,23,42,0.15);
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-  --danger-bg: #fef2f2;
-  --info: #38bdf8;
-}
-
-[data-theme="dark"] {
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-tertiary: #1e293b;
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --accent-primary: #f1f5f9;
-  --accent-secondary: #334155;
-  --accent-brand: #3b82f6;
-  --accent-brand-hover: #60a5fa;
-  --border-color: #334155;
-  --border-focus: #38bdf8;
-  --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
-  --shadow-md: 0 8px 25px rgba(0,0,0,0.4);
-  --shadow-lg: 0 20px 40px rgba(0,0,0,0.5);
-  --success: #4ade80;
-  --warning: #fbbf24;
-  --danger: #f87171;
-  --danger-bg: #450a0a;
-  --info: #7dd3fc;
-}
-
-*{box-sizing:border-box}html,body{margin:0;padding:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg-primary);color:var(--text-primary)}body{padding-bottom:78px}.topbar{height:72px;background:#0f172a;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 max(18px,calc((100% - 1180px)/2));position:sticky;top:0;z-index:1000}.brand{display:flex;align-items:center;gap:11px;cursor:pointer}.brand-mark{width:40px;height:40px;border-radius:12px;object-fit:cover;background:#fff;padding:3px;display:block}.campus-media{margin:30px 0}.media-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.media-card{background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;cursor:pointer}.media-card img,.media-card video{width:100%;height:190px;object-fit:cover;display:block}.media-card-body{padding:12px 14px}.media-card-body b{display:block;font-size:14px}.media-card-body span{display:block;color:#64748b;font-size:12px;margin-top:4px;line-height:1.4}.media-gallery{margin:18px 0}.media-gallery h3{margin:0 0 10px;font-size:18px}.gallery-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.gallery-grid figure{margin:0;background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden}.gallery-grid img,.gallery-grid video{width:100%;height:220px;object-fit:cover;display:block}.gallery-grid figcaption{padding:9px 11px;font-size:11px;color:#64748b}.video-badge{position:relative}.video-badge:after{content:"▶ Video";position:absolute;left:10px;top:10px;background:#0f172acc;color:#fff;border-radius:999px;padding:5px 8px;font-size:10px;font-weight:800}.college-photo{width:100%;height:220px;object-fit:cover;border-radius:18px;margin:14px 0 0}.detail-actions{flex-wrap:wrap}@media(max-width:760px){.media-grid{grid-template-columns:1fr 1fr}.media-card img,.media-card video{height:150px}.gallery-grid{grid-template-columns:1fr}.gallery-grid img,.gallery-grid video{height:210px}}.brand strong{display:block;font-size:15px}.brand small{display:block;color:#94a3b8;font-size:11px;margin-top:2px}.top-actions{display:flex;gap:7px}.icon-btn{border:0;background:#1e293b;color:#e2e8f0;border-radius:10px;width:40px;height:40px;font-size:19px;cursor:pointer}.page{display:none;max-width:1180px;margin:auto;padding:28px 18px}.page.active{display:block}
+*{box-sizing:border-box}html,body{margin:0;padding:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6f8fc;color:#111827}body{padding-bottom:78px}.topbar{height:72px;background:#0f172a;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 max(18px,calc((100% - 1180px)/2));position:sticky;top:0;z-index:1000}.brand{display:flex;align-items:center;gap:11px;cursor:pointer}.brand-mark{width:40px;height:40px;border-radius:12px;object-fit:cover;background:#fff;padding:3px;display:block}.campus-media{margin:30px 0}.media-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.media-card{background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;cursor:pointer}.media-card img,.media-card video{width:100%;height:190px;object-fit:cover;display:block}.media-card-body{padding:12px 14px}.media-card-body b{display:block;font-size:14px}.media-card-body span{display:block;color:#64748b;font-size:12px;margin-top:4px;line-height:1.4}.media-gallery{margin:18px 0}.media-gallery h3{margin:0 0 10px;font-size:18px}.gallery-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.gallery-grid figure{margin:0;background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden}.gallery-grid img,.gallery-grid video{width:100%;height:220px;object-fit:cover;display:block}.gallery-grid figcaption{padding:9px 11px;font-size:11px;color:#64748b}.video-badge{position:relative}.video-badge:after{content:"▶ Video";position:absolute;left:10px;top:10px;background:#0f172acc;color:#fff;border-radius:999px;padding:5px 8px;font-size:10px;font-weight:800}.college-photo{width:100%;height:220px;object-fit:cover;border-radius:18px;margin:14px 0 0}.detail-actions{flex-wrap:wrap}@media(max-width:760px){.media-grid{grid-template-columns:1fr 1fr}.media-card img,.media-card video{height:150px}.gallery-grid{grid-template-columns:1fr}.gallery-grid img,.gallery-grid video{height:210px}}.brand strong{display:block;font-size:15px}.brand small{display:block;color:#94a3b8;font-size:11px;margin-top:2px}.top-actions{display:flex;gap:7px}.icon-btn{border:0;background:#1e293b;color:#e2e8f0;border-radius:10px;width:40px;height:40px;font-size:19px;cursor:pointer}.page{display:none;max-width:1180px;margin:auto;padding:28px 18px}.page.active{display:block}
 .hero-aerial{position:relative;min-height:calc(100vh - 72px);padding:0!important;isolation:isolate;background:#07111f;overflow:hidden;box-shadow:none;border-radius:0}
 .hero-aerial-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-3;filter:saturate(1.04) contrast(1.02);transform:scale(1.01)}
 .hero-aerial-overlay{position:absolute;inset:0;z-index:-2;background:linear-gradient(90deg,#020617d9 0%,#0206179e 38%,#02061725 72%,#02061710 100%),linear-gradient(0deg,#020617a8,#02061708 60%)}
@@ -141,6 +94,89 @@
 .indoor-admin-row b,.indoor-admin-row small{display:block}
 .indoor-admin-row small{color:#64748b;font-size:10px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:760px){.indoor-admin-form{grid-template-columns:1fr}.indoor-admin-form label:nth-child(5){grid-column:auto}.indoor-admin-row{align-items:stretch;flex-wrap:wrap}.indoor-admin-row>div{flex-basis:100%}}
+
+/* High-contrast Dark Mode readability across UI cards, text, inputs & lists */
+body.dark, html.dark, [data-theme="dark"] body, [data-theme="dark"] {
+  background: #0b1120 !important;
+  color: #f1f5f9 !important;
+}
+body.dark .place-card, html.dark .place-card, [data-theme="dark"] .place-card,
+body.dark .quick-grid button, html.dark .quick-grid button, [data-theme="dark"] .quick-grid button,
+body.dark .media-card, html.dark .media-card, [data-theme="dark"] .media-card,
+body.dark .gallery-grid figure, html.dark .gallery-grid figure, [data-theme="dark"] .gallery-grid figure,
+body.dark .detail-grid > div, html.dark .detail-grid > div, [data-theme="dark"] .detail-grid > div,
+body.dark .legal-copy, html.dark .legal-copy, [data-theme="dark"] .legal-copy,
+body.dark .admin-list, html.dark .admin-list, [data-theme="dark"] .admin-list,
+body.dark .stats > div, html.dark .stats > div, [data-theme="dark"] .stats > div,
+body.dark .chip, html.dark .chip, [data-theme="dark"] .chip,
+body.dark .indoor-guide, html.dark .indoor-guide, [data-theme="dark"] .indoor-guide,
+body.dark .route-row, html.dark .route-row, [data-theme="dark"] .route-row,
+body.dark .empty, html.dark .empty, [data-theme="dark"] .empty {
+  background: #111827 !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+body.dark .place-info h3, html.dark .place-info h3, [data-theme="dark"] .place-info h3,
+body.dark .quick-grid button, html.dark .quick-grid button, [data-theme="dark"] .quick-grid button,
+body.dark .media-card-body b, html.dark .media-card-body b, [data-theme="dark"] .media-card-body b,
+body.dark .section-head h2, html.dark .section-head h2, [data-theme="dark"] .section-head h2,
+body.dark .page-title h2, html.dark .page-title h2, [data-theme="dark"] .page-title h2,
+body.dark h1, body.dark h2, body.dark h3, body.dark h4,
+html.dark h1, html.dark h2, html.dark h3, html.dark h4,
+[data-theme="dark"] h1, [data-theme="dark"] h2, [data-theme="dark"] h3, [data-theme="dark"] h4 {
+  color: #f8fafc !important;
+}
+body.dark .place-info p, body.dark .place-info small,
+body.dark .media-card-body span, body.dark .gallery-grid figcaption,
+body.dark .muted, body.dark .map-legend, body.dark .footer, body.dark .eyebrow,
+html.dark .place-info p, html.dark .place-info small,
+html.dark .media-card-body span, html.dark .gallery-grid figcaption,
+html.dark .muted, html.dark .map-legend, html.dark .footer, html.dark .eyebrow,
+[data-theme="dark"] .place-info p, [data-theme="dark"] .place-info small,
+[data-theme="dark"] .media-card-body span, [data-theme="dark"] .gallery-grid figcaption,
+[data-theme="dark"] .muted, [data-theme="dark"] .map-legend, [data-theme="dark"] .footer, [data-theme="dark"] .eyebrow {
+  color: #cbd5e1 !important;
+}
+body.dark .search-box, html.dark .search-box, [data-theme="dark"] .search-box {
+  background: #1e293b !important;
+  border-color: #475569 !important;
+}
+body.dark .search-box input, html.dark .search-box input, [data-theme="dark"] .search-box input {
+  color: #f8fafc !important;
+}
+body.dark .search-box input::placeholder, html.dark .search-box input::placeholder, [data-theme="dark"] .search-box input::placeholder {
+  color: #94a3b8 !important;
+}
+body.dark .secondary-btn, html.dark .secondary-btn, [data-theme="dark"] .secondary-btn,
+body.dark .back-btn, html.dark .back-btn, [data-theme="dark"] .back-btn {
+  background: #1e293b !important;
+  color: #f8fafc !important;
+  border-color: #475569 !important;
+}
+body.dark .modal-card, html.dark .modal-card, [data-theme="dark"] .modal-card {
+  background: #111827 !important;
+  color: #f8fafc !important;
+}
+body.dark .full-input, body.dark .form-grid input, body.dark .form-grid select,
+body.dark .coordinate-fields input, body.dark .indoor-admin-form input, body.dark .indoor-admin-form select,
+html.dark .full-input, html.dark .form-grid input, html.dark .form-grid select,
+html.dark .coordinate-fields input, html.dark .indoor-admin-form input, html.dark .indoor-admin-form select,
+[data-theme="dark"] .full-input, [data-theme="dark"] .form-grid input, [data-theme="dark"] .form-grid select,
+[data-theme="dark"] .coordinate-fields input, [data-theme="dark"] .indoor-admin-form input, [data-theme="dark"] .indoor-admin-form select {
+  background: #1e293b !important;
+  color: #f8fafc !important;
+  border-color: #475569 !important;
+}
+body.dark .bottom-nav, html.dark .bottom-nav, [data-theme="dark"] .bottom-nav {
+  background: #0f172a !important;
+  border-top-color: #1e293b !important;
+}
+body.dark .chip.active, html.dark .chip.active, [data-theme="dark"] .chip.active {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #2563eb !important;
+}
+
 </style>
 </head>
 <body>
@@ -158,7 +194,6 @@
     <div class="top-actions">
       <button class="icon-btn" title="Install app" id="installBtn" hidden>⇩</button>
       <button class="icon-btn" title="My location" onclick="app.locate()">⌖</button>
-      <button class="icon-btn" title="Toggle Dark Mode" id="darkModeToggle" onclick="app.toggleDarkMode()">🌙</button>
       <button class="icon-btn" title="Admin" onclick="app.openAdmin()">⚙</button>
     </div>
   </header>
@@ -189,28 +224,10 @@
         <button onclick="app.openCategories('Laboratory')"><b>🧪</b><span>Laboratories</span></button>
         <button onclick="app.openCategories('Office')"><b>👨‍💼</b><span>Offices</span></button>
         <button onclick="app.openCategories('Facility')"><b>⭐</b><span>Facilities</span></button>
-        <button onclick="app.openAssistant()"><b>🤖</b><span>AI Assistant</span></button>
         <button onclick="app.show('favorites')"><b>♥</b><span>Favorites</span></button>
       </div>
 
-      <section class="ai-campus-section" aria-labelledby="aiCampusTitle">
-        <div class="ai-campus-copy">
-          <div class="assistant-avatar ai-large">AI</div>
-          <div>
-            <span class="eyebrow">INDOOR CAMPUS HELP</span>
-            <h2 id="aiCampusTitle">Ask AI where anything is</h2>
-            <p>Ask about classrooms, labs, offices and facilities. The assistant uses your campus information and uploaded indoor floor maps to identify the building, floor and location and give practical directions.</p>
-            <div class="ai-example-chips">
-              <button type="button" onclick="app.askExample('Where is LH-01?')">Where is LH-01?</button>
-              <button type="button" onclick="app.askExample('Which floor is the Computer Lab?')">Which floor is the Computer Lab?</button>
-              <button type="button" onclick="app.askExample('How do I reach LH-201?')">How do I reach LH-201?</button>
-            </div>
-          </div>
-          <button class="ai-open-btn" type="button" onclick="app.openAssistant()">Ask AI →</button>
-        </div>
-      </section>
-
-      <div id="userIndoorSection" class="campus-media" hidden>
+<div id="userIndoorSection" class="campus-media" hidden>
         <div class="section-head"><h2>Indoor Maps</h2><span class="eyebrow">ADMIN MAPS</span></div>
         <div id="userIndoorList" class="place-grid"></div>
       </div>
@@ -222,7 +239,7 @@
         <div class="section-head"><h2>Campus Views</h2><span class="eyebrow">REAL CAMPUS FOOTAGE</span></div>
         <div class="media-grid">
           <article class="media-card video-badge" onclick="app.openCampusMedia('aerial')">
-            <img src="media/aerial-campus.jpg" alt="Aerial campus view" loading="lazy" decoding="async">
+            <img src="media/aerial-campus.jpg" alt="Aerial campus view" loading="eager" decoding="async">
             <div class="media-card-body"><b>Aerial Campus View</b><span>Explore the campus layout from above.</span></div>
           </article>
           <article class="media-card video-badge" onclick="app.openCampusMedia('main')">
@@ -235,16 +252,7 @@
           </article>
         </div>
       </div>
-
-      <div class="assistant-card">
-        <div class="assistant-avatar">AI</div>
-        <div>
-          <strong>Campus Assistant</strong>
-          <p>Ask me things like “Where is the library?”</p>
-        </div>
-        <button onclick="app.openAssistant()">Ask</button>
-      </div>
-    </section>
+</section>
 
     <section id="map" class="page">
       <div class="page-nav-actions"><button class="back-btn" type="button" onclick="app.goBack()" aria-label="Go back">← Back</button><button class="home-btn" type="button" data-home-button onclick="app.show('home')" aria-label="Go to Home">⌂ Home</button></div>

@@ -39,7 +39,6 @@ const app = {
   routeLine: null,
   routePassedLine: null,
   navigationStarted: false,
-  navigationPaused: false,
   campusRouteLayer: null,
   deferredInstall: null,
   currentLocation: null,
@@ -49,7 +48,6 @@ const app = {
   navigationSteps: [],
   navigationStepIndex: 0,
   userAccuracyCircle: null,
-  darkMode: false,
   lastHeading: 0,
   lastRerouteAt: 0,
   arrivalStableCount: 0,
@@ -64,11 +62,18 @@ const app = {
   currentPlacesCategory: "All",
 async init() {
     const cached = JSON.parse(localStorage.getItem("campus_places") || "null");
-    this.places = cached || DEFAULT_PLACES;
-    await this.loadPlacesFromServer();
-    await this.loadRoutesFromServer();
-    await this.loadIndoorMapsFromServer();
-    this.initDarkMode();
+    this.places = (Array.isArray(cached) && cached.length) ? cached : DEFAULT_PLACES;
+    try {
+      const cachedMaps = JSON.parse(localStorage.getItem("campus_indoor_maps_v2") || "[]");
+      if (Array.isArray(cachedMaps) && cachedMaps.length) {
+        this.indoorMaps = cachedMaps;
+        this.applyIndoorMaps();
+      }
+      const cachedRoutes = JSON.parse(localStorage.getItem("campus_routes") || "[]");
+      if (Array.isArray(cachedRoutes) && cachedRoutes.length) {
+        this.campusRoutes = cachedRoutes;
+      }
+    } catch {}
     document.title = CAMPUS_CONFIG.name + " | Campus Navigator";
     $("#brandName").textContent = CAMPUS_CONFIG.shortName;
     this.renderPopular();
@@ -76,6 +81,17 @@ async init() {
     this.renderPlaces("", this.currentPlacesCategory);
     this.renderCategories();
     this.renderFavorites();
+    Promise.allSettled([
+      this.loadPlacesFromServer().then(() => {
+        this.renderPopular();
+        this.renderPlaces($("#placesSearch")?.value || "", this.currentPlacesCategory || "All");
+        this.renderCategories();
+        this.renderFavorites();
+        if (this.map) { this.renderMarkers(); this.render3DMarkers(); }
+      }),
+      this.loadRoutesFromServer(),
+      this.loadIndoorMapsFromServer()
+    ]);
     this.initMap();
     this.installNavigationStyles();
     this.registerPWA();
@@ -142,18 +158,24 @@ async init() {
     }
   },
   applyIndoorMaps(){
-    // Uploaded admin maps override built-in floor maps without requiring code changes.
+    // Rebuild admin-managed building entries from current indoorMaps so deletions take effect immediately.
+    const adminBuildings=new Set((this.indoorMaps||[]).map(m=>String(m?.building||'').trim()).filter(Boolean));
+    for(const key of Object.keys(BUILDING_GUIDES)){
+      if(adminBuildings.has(key)) delete BUILDING_GUIDES[key];
+    }
     for(const m of this.indoorMaps||[]){
       if(!m?.building||!m?.floor||!m?.image) continue;
-      const existing=BUILDING_GUIDES[m.building] || {title:m.building,source:"Admin uploaded",floors:[],maps:{},image:m.image,note:"Indoor floor map uploaded by the campus administrator."};
-      existing.title=existing.title||m.building;
+      const bName=String(m.building).trim();
+      const fName=String(m.floor).trim();
+      const existing=BUILDING_GUIDES[bName] || {title:bName,source:m.source||"Admin uploaded",floors:[],maps:{},image:m.image,note:m.note||"Indoor floor map uploaded by the campus administrator."};
+      existing.title=existing.title||bName;
       existing.maps=existing.maps||{};
-      if(!existing.floors.includes(m.floor)) existing.floors.push(m.floor);
-      existing.maps[m.floor]=m.image;
+      if(!existing.floors.some(f=>this.normalizeIndoorValue(f)===this.normalizeIndoorValue(fName))) existing.floors.push(fName);
+      existing.maps[fName]=m.image;
       existing.image=existing.maps[existing.floors[0]]||m.image;
       existing.source=m.source||existing.source||"Admin uploaded";
       existing.note=m.note||existing.note||"Indoor floor map uploaded by the campus administrator.";
-      BUILDING_GUIDES[m.building]=existing;
+      BUILDING_GUIDES[bName]=existing;
     }
   },
   async saveRoutes(){
@@ -514,26 +536,14 @@ async init() {
   },
 
   startNavigation(p) {
-    // A fresh start always creates a new route. Resume uses resumeNavigation()
-    // and therefore does not call this method.
     this.stopNavigation(false);
-    this.navigationDestination = p || this.navigationDestination;
-    if (!this.navigationDestination) return;
-    this.navigationDestination._arrived = false;
-    this.arrivalStableCount = 0;
-    this.lastArrivalDistance = Infinity;
-    this.navigationPaused = false;
-    this.navigationStarted = true;
-    this.showNavigationLoading(this.navigationDestination);
-    if (this.currentLocation) {
-      this.buildRoute(this.navigationDestination, true);
-    } else {
-      this.locate(() => {
-        if (this.navigationStarted && !this.navigationPaused) {
-          this.buildRoute(this.navigationDestination, true);
-        }
-      });
-    }
+    this.navigationDestination=p;
+    this.navigationDestination._arrived=false;
+    this.arrivalStableCount=0;
+    this.lastArrivalDistance=Infinity;
+    this.navigationStarted=true;
+    this.showNavigationLoading(p);
+    if(this.currentLocation) this.buildRoute(p,true); else this.locate(()=>this.buildRoute(p,true));
   },
 
   showNavigationReady(p){
@@ -543,53 +553,15 @@ async init() {
     $("#routePanel").innerHTML=`<div class="nav-direction"><div class="nav-turn">🧭</div><div class="nav-copy"><strong>Navigate to ${this.escape(p.name)}</strong><small>${guide?`${this.escape(p.building)} · ${this.escape(p.floor||"Floor not specified")} — outdoor route first, then use the indoor guide.`:"Press Start Navigation to use live GPS."}</small></div></div><div class="nav-actions"><button type="button" class="primary-btn" onclick="app.startNavigation(app.navigationDestination)">▶ Start Navigation</button>${guide?`<button type="button" class="secondary-btn" onclick="app.openIndoorGuide('${this.escapeAttr(p.building)}','${this.escapeAttr(p.floor)}')">🏢 Indoor Guide</button>`:""}<button type="button" class="secondary-btn nav-stop-btn" onclick="app.stopNavigation(true)">⏹ Stop</button></div>`;
   },
 
-  pauseNavigation() {
-    if (!this.navigationStarted || this.navigationPaused) return;
-    this.navigationPaused = true;
-    if (this.navigationWatchId !== null) {
-      navigator.geolocation.clearWatch(this.navigationWatchId);
-      this.navigationWatchId = null;
-    }
-    // Keep destination, route geometry, passed route line, progress and step index.
-    this.updateNavigationInstruction();
-    this.toast("Navigation paused. Your route and progress are saved.");
-  },
-
-  resumeNavigation() {
-    if (!this.navigationPaused || !this.navigationDestination) return;
-    this.navigationPaused = false;
-    this.navigationStarted = true;
-    this.startWatchingLocation();
-    this.updateNavigationInstruction();
-    this.toast("Navigation resumed.");
-  },
-
-  stopNavigation(clearPanel=true, returnToReady=false) {
-    if (this.navigationWatchId !== null) {
-      navigator.geolocation.clearWatch(this.navigationWatchId);
-      this.navigationWatchId = null;
-    }
-    this.navigationStarted = false;
-    this.navigationPaused = false;
-    this.navigationRoute = null;
-    this.navigationSteps = [];
-    this.navigationStepIndex = 0;
-    this.arrivalStableCount = 0;
-    this.lastArrivalDistance = Infinity;
+  stopNavigation(clearPanel=true) {
+    if(this.navigationWatchId!==null){navigator.geolocation.clearWatch(this.navigationWatchId);this.navigationWatchId=null;}
+    this.navigationStarted=false;
+    this.navigationRoute=null;
+    this.navigationSteps=[];
+    this.navigationStepIndex=0;
     this.clearNavigationLayers();
-
-    // Stop returns to the selected destination's ready screen, so the user can
-    // start the same destination again or choose another one.
-    if (this.navigationDestination) this.navigationDestination._arrived = false;
-    if (returnToReady && this.navigationDestination) {
-      this.showNavigationReady(this.navigationDestination);
-    } else if (clearPanel) {
-      const panel = $("#routePanel");
-      if (panel) {
-        panel.hidden = true;
-        panel.classList.remove("nav-arrived");
-      }
-    }
+    if(clearPanel){const panel=$("#routePanel");if(panel){panel.hidden=true;panel.classList.remove('nav-arrived');}}
+    else if(this.navigationDestination) this.showNavigationReady(this.navigationDestination);
   },
 
   clearNavigationLayers(){
@@ -621,95 +593,111 @@ async init() {
   },
 
   updateUserLocation(pos){
-    // Ignore any queued GPS callback after Pause; retain the last known position.
-    if (this.navigationPaused) return;
-
-    this.previousLocation = this.currentLocation;
-    this.currentLocation = [pos.coords.latitude, pos.coords.longitude];
+    this.previousLocation=this.currentLocation;
+    this.currentLocation=[pos.coords.latitude,pos.coords.longitude];
     this.ensureUserMarker();
     this.userMarker.setLatLng(this.currentLocation);
     this.updateUserHeading(pos);
-    const accuracy = Math.max(5, Number(pos.coords.accuracy || 20));
-    if (!this.userAccuracyCircle) {
-      this.userAccuracyCircle = L.circle(this.currentLocation, {
-        radius: accuracy, className: "accuracy-circle", interactive: false
-      }).addTo(this.map);
+    const accuracy=Math.max(5,Number(pos.coords.accuracy||20));
+    if(!this.userAccuracyCircle){
+      this.userAccuracyCircle=L.circle(this.currentLocation,{radius:accuracy,className:"accuracy-circle",interactive:false}).addTo(this.map);
     } else {
       this.userAccuracyCircle.setLatLng(this.currentLocation).setRadius(accuracy);
     }
-
-    if (this.navigationDestination && this.navigationRoute && this.navigationStarted) {
-      const distance = this.map.distance(
-        this.currentLocation,
-        [this.navigationDestination.lat, this.navigationDestination.lng]
-      );
-      const arrivalRadius = Math.min(18, Math.max(6, Math.min(accuracy * 0.55, 12)));
-      if (distance <= arrivalRadius) {
-        this.arrivalStableCount =
-          (this.lastArrivalDistance < Infinity && distance <= this.lastArrivalDistance + 2)
-            ? this.arrivalStableCount + 1 : 1;
-        if (this.arrivalStableCount >= 2) {
-          this.reachedDestination(distance);
-          return;
-        }
-      } else {
-        this.arrivalStableCount = 0;
-      }
-      this.lastArrivalDistance = distance;
-
-      const nearest = this.nearestRouteIndex(this.currentLocation);
-      if (nearest >= 0) {
-        const nearestCoord = this.navigationRoute.geometry.coordinates[nearest];
-        const offRoute = this.map.distance(
-          this.currentLocation, [nearestCoord[1], nearestCoord[0]]
-        );
-        const offRouteLimit = Math.max(45, Math.min(75, Number(pos.coords.accuracy || 20) * 2.5));
-        if (offRoute > offRouteLimit && Date.now() - this.lastRerouteAt > 12000) {
-          this.lastRerouteAt = Date.now();
-          this.buildRoute(this.navigationDestination, true);
+    if(this.navigationDestination && this.navigationRoute){
+      const distance=this.map.distance(this.currentLocation,[this.navigationDestination.lat,this.navigationDestination.lng]);
+      const accuracy=Math.max(5,Number(pos.coords.accuracy||20));
+      // GPS can report a position several metres away from the real user. Do not
+      // declare arrival from one noisy reading. Require a small, accuracy-aware
+      // radius and two consecutive good readings.
+      const arrivalRadius=Math.min(18,Math.max(6,Math.min(accuracy*0.55,12)));
+      if(distance<=arrivalRadius){
+        this.arrivalStableCount=(this.lastArrivalDistance<Infinity && distance<=this.lastArrivalDistance+2) ? this.arrivalStableCount+1 : 1;
+        if(this.arrivalStableCount>=2){this.reachedDestination(distance);return;}
+      }else{this.arrivalStableCount=0;}
+      this.lastArrivalDistance=distance;
+      const nearest=this.nearestRouteIndex(this.currentLocation);
+      if(nearest>=0){
+        const nearestCoord=this.navigationRoute.geometry.coordinates[nearest];
+        const offRoute=this.map.distance(this.currentLocation,[nearestCoord[1],nearestCoord[0]]);
+        const offRouteLimit=Math.max(45,Math.min(75,Number(pos.coords.accuracy||20)*2.5));
+        if(offRoute>offRouteLimit && Date.now()-this.lastRerouteAt>12000){
+          this.lastRerouteAt=Date.now();
+          this.buildRoute(this.navigationDestination,true);
           return;
         }
       }
-
-      const total = this.navigationRoute.geometry.coordinates.length;
-      if (nearest >= 0 && total > 1) {
-        const progress = Math.max(0, Math.min(100, (nearest / (total - 1)) * 100));
-        const bar = $("#navProgress");
-        if (bar) bar.style.width = progress + "%";
+      const total=this.navigationRoute.geometry.coordinates.length;
+      if(nearest>=0 && total>1){
+        const progress=Math.max(0,Math.min(100,(nearest/(total-1))*100));
+        const bar=$("#navProgress"); if(bar)bar.style.width=progress+"%";
         this.updateMovingRouteLine(nearest);
       }
       this.updateNavigationInstruction();
-      if (this.map.getBounds().contains(this.currentLocation) === false) {
-        this.map.setView(this.currentLocation, Math.max(this.map.getZoom(), 18), { animate: true });
+      if(this.navigationStarted || this.map.getBounds().contains(this.currentLocation)===false){
+        this.map.panTo(this.currentLocation,{animate:true,duration:0.4});
       }
     }
   },
 
-  updateMovingRouteLine(nearestIndex){
-    if(!this.navigationRoute?.geometry?.coordinates?.length || !this.map)return;
+  projectOntoSegment(p, a, b){
+    const latRef=a[0]*Math.PI/180;
+    const kx=111320*Math.cos(latRef);
+    const ky=110540;
+    const ax=(a[1]-a[1])*kx, ay=(a[0]-a[0])*ky;
+    const bx=(b[1]-a[1])*kx, by=(b[0]-a[0])*ky;
+    const px=(p[1]-a[1])*kx, py=(p[0]-a[0])*ky;
+    const dx=bx-ax, dy=by-ay;
+    const lenSq=dx*dx+dy*dy;
+    let t=lenSq>0?((px-ax)*dx+(py-ay)*dy)/lenSq:0;
+    t=Math.max(0,Math.min(1,t));
+    const qLat=a[0]+t*(b[0]-a[0]);
+    const qLng=a[1]+t*(b[1]-a[1]);
+    return {lat:qLat,lng:qLng,t,dist:this.map.distance(p,[qLat,qLng])};
+  },
+
+  nearestRouteIndex(loc){
+    if(!this.navigationRoute?.geometry?.coordinates?.length)return -1;
     const coords=this.navigationRoute.geometry.coordinates;
-    const start=Math.max(0,Math.min(nearestIndex,coords.length-1));
-    const remaining=[[this.currentLocation[1],this.currentLocation[0]],...coords.slice(start+1)];
-    if(this.routeLine)this.routeLine.setLatLngs(remaining.map(c=>[c[1],c[0]]));
-    else if(remaining.length>1)this.routeLine=L.polyline(remaining.map(c=>[c[1],c[0]]),{weight:7,color:'#2563eb',opacity:.95,lineCap:'round',lineJoin:'round'}).addTo(this.map);
-    const passed=coords.slice(0,start+1).map(c=>[c[1],c[0]]);
-    if(passed.length>1){
-      passed.push([this.currentLocation[0],this.currentLocation[1]]);
-      if(this.routePassedLine)this.routePassedLine.setLatLngs(passed);
-      else this.routePassedLine=L.polyline(passed,{weight:7,color:'#94a3b8',opacity:.55,lineCap:'round',lineJoin:'round'}).addTo(this.map);
+    if(coords.length===1)return 0;
+    let bestSeg=0, bestD=Infinity;
+    for(let i=0;i<coords.length-1;i++){
+      const a=[coords[i][1],coords[i][0]];
+      const b=[coords[i+1][1],coords[i+1][0]];
+      const proj=this.projectOntoSegment(loc,a,b);
+      if(proj.dist<bestD){bestD=proj.dist;bestSeg=i;}
+    }
+    return bestSeg;
+  },
+
+  updateMovingRouteLine(nearestIndex){
+    if(!this.navigationRoute?.geometry?.coordinates?.length || !this.map || !this.currentLocation)return;
+    const coords=this.navigationRoute.geometry.coordinates;
+    const seg=Math.max(0,Math.min(nearestIndex,coords.length-2));
+    const a=[coords[seg][1],coords[seg][0]];
+    const b=[coords[seg+1][1],coords[seg+1][0]];
+    const proj=this.projectOntoSegment(this.currentLocation,a,b);
+    const anchor=[proj.lat,proj.lng];
+
+    const remLatLngs=[anchor,...coords.slice(seg+1).map(c=>[c[1],c[0]])];
+    if(remLatLngs.length>=2){
+      if(this.routeLine)this.routeLine.setLatLngs(remLatLngs);
+      else this.routeLine=L.polyline(remLatLngs,{weight:7,color:'#2563eb',opacity:.95,lineCap:'round',lineJoin:'round'}).addTo(this.map);
+    }else if(this.routeLine){
+      this.routeLine.remove();
+      this.routeLine=null;
+    }
+
+    const passedLatLngs=[...coords.slice(0,seg+1).map(c=>[c[1],c[0]]),anchor];
+    if(passedLatLngs.length>=2){
+      if(this.routePassedLine)this.routePassedLine.setLatLngs(passedLatLngs);
+      else this.routePassedLine=L.polyline(passedLatLngs,{weight:7,color:'#94a3b8',opacity:.55,lineCap:'round',lineJoin:'round'}).addTo(this.map);
     }
   },
 
   startWatchingLocation(){
-    if (!this.navigationStarted || this.navigationPaused || !navigator.geolocation ||
-        this.navigationWatchId !== null) return;
-    this.navigationWatchId = navigator.geolocation.watchPosition(
-      pos => {
-        if (!this.navigationPaused && this.navigationStarted) this.updateUserLocation(pos);
-      },
-      () => this.toast("Live location updates are unavailable. Check location permission."),
-      { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
-    );
+    if(!navigator.geolocation || this.navigationWatchId!==null)return;
+    this.navigationWatchId=navigator.geolocation.watchPosition(pos=>this.updateUserLocation(pos),()=>this.toast("Live location updates are unavailable. Check location permission."),{enableHighAccuracy:true,maximumAge:2000,timeout:10000});
   },
 
   bearingBetween(lat1,lng1,lat2,lng2){
@@ -719,15 +707,7 @@ async init() {
     return (toDeg(Math.atan2(y,x))+360)%360;
   },
 
-  nearestRouteIndex(loc){
-    if(!this.navigationRoute?.geometry?.coordinates?.length)return -1;
-    let best=-1,bestD=Infinity;
-    this.navigationRoute.geometry.coordinates.forEach((c,i)=>{
-      const d=this.map.distance(loc,[c[1],c[0]]);
-      if(d<bestD){bestD=d;best=i;}
-    });
-    return best;
-  },
+
 
   formatStep(step){
     const m=step.maneuver||{};
@@ -746,54 +726,28 @@ async init() {
   },
 
   updateNavigationInstruction(){
-    if (!this.navigationSteps.length || !this.navigationRoute || !this.currentLocation) return;
-
-    const nextLocation = this.currentLocation;
-    let next = this.navigationStepIndex;
-    while (next < this.navigationSteps.length - 1) {
-      const step = this.navigationSteps[next];
-      const end = step.maneuver?.location;
-      if (!end) break;
-      const d = this.map.distance(nextLocation, [end[1], end[0]]);
-      if (d < 18) next++;
-      else break;
+    if(!this.navigationSteps.length || !this.navigationRoute)return;
+    const idx=this.nearestRouteIndex(this.currentLocation);
+    let next=this.navigationStepIndex;
+    while(next<this.navigationSteps.length-1){
+      const step=this.navigationSteps[next];
+      const end=step.maneuver?.location;
+      if(!end)break;
+      const d=this.map.distance(this.currentLocation,[end[1],end[0]]);
+      if(d<18) next++; else break;
     }
-    this.navigationStepIndex = next;
-
-    const step = this.navigationSteps[next];
-    const end = step.maneuver?.location;
-    const d = end ? this.map.distance(nextLocation, [end[1], end[0]]) : 0;
-    const icon = ({
-      left: "↰", right: "↱", straight: "↑", slight_left: "↖",
-      slight_right: "↗", sharp_left: "↙", sharp_right: "↘", uturn: "↶"
-    }[step.maneuver?.modifier] || "↑");
-    const text = this.formatStep(step);
-    const distanceText = d < 1000 ? `${Math.round(d)} m` : `${(d / 1000).toFixed(1)} km`;
-    const total = this.navigationSteps.length;
-
-    $("#routePanel").hidden = false;
-    $("#routePanel").classList.remove("nav-arrived");
-    $("#routePanel").innerHTML = `
-      <div class="nav-direction">
-        <div class="nav-turn">${this.navigationPaused ? "Ⅱ" : icon}</div>
-        <div class="nav-copy">
-          <strong>${this.navigationPaused ? "Navigation paused" : this.escape(text)}</strong>
-          <small>${distanceText} · Step ${Math.min(next + 1, total)} of ${total}</small>
-        </div>
-      </div>
-      <div class="nav-progress"><i id="navProgress"></i></div>
-      <div class="nav-actions">
-        ${this.navigationPaused
-          ? '<button type="button" class="primary-btn" onclick="app.resumeNavigation()">▶ Resume</button>'
-          : '<button type="button" class="secondary-btn" onclick="app.pauseNavigation()">Ⅱ Pause</button>'}
-        <button type="button" class="secondary-btn nav-stop-btn" onclick="app.stopNavigation(true,true)">⏹ Stop Navigation</button>
-      </div>`;
-
-    const nearest = this.nearestRouteIndex(this.currentLocation);
-    if (nearest >= 0 && this.navigationRoute.geometry.coordinates.length > 1) {
-      $("#navProgress").style.width =
-        (nearest / (this.navigationRoute.geometry.coordinates.length - 1) * 100) + "%";
-    }
+    this.navigationStepIndex=next;
+    const step=this.navigationSteps[next];
+    const end=step.maneuver?.location;
+    const d=end?this.map.distance(this.currentLocation,[end[1],end[0]]):0;
+    const icon=({left:'↰',right:'↱',straight:'↑',slight_left:'↖',slight_right:'↗',sharp_left:'↙',sharp_right:'↘',uturn:'↶'}[step.maneuver?.modifier]||'↑');
+    const text=this.formatStep(step);
+    const distanceText=d<1000 ? `${Math.round(d)} m` : `${(d/1000).toFixed(1)} km`;
+    const total=this.navigationSteps.length;
+    $("#routePanel").hidden=false;
+    $("#routePanel").innerHTML=`<div class="nav-direction"><div class="nav-turn">${icon}</div><div class="nav-copy"><strong>${this.escape(text)}</strong><small>${distanceText} · Step ${Math.min(next+1,total)} of ${total}</small></div></div><div class="nav-progress"><i id="navProgress"></i></div><div class="nav-actions"><button type="button" class="secondary-btn nav-stop-btn" onclick="app.stopNavigation(true)">⏹ Stop Navigation</button></div>`;
+    const nearest=this.nearestRouteIndex(this.currentLocation);
+    if(nearest>=0 && this.navigationRoute.geometry.coordinates.length>1){$("#navProgress").style.width=(nearest/(this.navigationRoute.geometry.coordinates.length-1)*100)+"%";}
   },
 
   reachedDestination(distance){
@@ -1013,19 +967,29 @@ async init() {
   async loginAdmin(){
     const username=(document.getElementById("adminUsername")?.value||"").trim();
     const password=$("#adminPassword").value;
+    const loginBtn=document.querySelector(".admin-login-btn");
     if(!username){this.toast("Enter the admin username.");return;}
     if(!password){this.toast("Enter the admin password.");return;}
+    if(loginBtn){loginBtn.disabled=true;loginBtn.textContent="Signing in…";}
     try{
-      const res=await fetch("/api/admin-login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username,password})});
+      const controller=new AbortController();
+      const timer=setTimeout(()=>controller.abort(),6000);
+      const res=await fetch("/api/admin-login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username,password}),signal:controller.signal});
+      clearTimeout(timer);
       if(!res.ok){this.toast(res.status===401?"Incorrect username or password.":"Admin login is unavailable.");return;}
       const data=await res.json();
       if(!data.ok){this.toast("Incorrect username or password.");return;}
       sessionStorage.setItem("admin_session","1");
       if(data.token){sessionStorage.setItem("admin_token",data.token);this.adminToken=data.token;}
-      await this.loadPlacesFromServer();
-      await this.loadIndoorMapsFromServer();
-      this.closeAdmin();this.renderAdmin();this.show("admin");
-    }catch(e){this.toast("Admin login is temporarily unavailable.");}
+      this.closeAdmin();
+      this.renderAdmin();
+      this.show("admin");
+      Promise.allSettled([this.loadPlacesFromServer(), this.loadIndoorMapsFromServer()]).then(()=>this.renderAdmin());
+    }catch(e){
+      this.toast(e?.name==="AbortError"?"Login timed out. Please try again.":"Admin login is temporarily unavailable.");
+    }finally{
+      if(loginBtn){loginBtn.disabled=false;loginBtn.textContent="Open Dashboard";}
+    }
   },
   toggleAdminPassword(){
     const input=document.getElementById("adminPassword");
@@ -1056,53 +1020,226 @@ async init() {
     const esc=v=>this.escape(String(v??''));
     const attr=v=>this.escapeAttr(String(v??''));
     const options=allBuildings.map(b=>`<option value="${attr(b)}">${esc(b)}</option>`).join('');
-    const maps=Array.isArray(this.indoorMaps)?this.indoorMaps:[];
-    const rows=maps.length?maps.slice().sort((a,b)=>`${a.building} ${a.floor}`.localeCompare(`${b.building} ${b.floor}`)).map(m=>`<div style="display:flex;gap:8px;align-items:center;padding:12px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;margin-top:8px"><div style="flex:1"><b>${esc(m.building)}</b><small style="display:block;color:#64748b;margin-top:3px">${esc(m.floor)}${m.source?' · '+esc(m.source):''}</small></div><button type="button" class="secondary-btn" data-replace="${attr(m.id)}">Replace</button><button type="button" class="danger-text" data-delete="${attr(m.id)}">Delete</button></div>`).join(''):'<div style="padding:24px;text-align:center;color:#64748b">No admin-uploaded indoor maps yet.</div>';
+    const floorPresets=['Ground Floor','1st Floor','2nd Floor','3rd Floor'];
+
+    const renderRowsHtml=()=>{
+      const maps=Array.isArray(this.indoorMaps)?this.indoorMaps:[];
+      if(!maps.length) return '<div style="padding:24px;text-align:center;color:#64748b;border:1px dashed #cbd5e1;border-radius:12px;background:#f8fafc">No admin-uploaded indoor maps yet. Add a floor map above.</div>';
+      return maps.slice().sort((a,b)=>`${a.building} ${a.floor}`.localeCompare(`${b.building} ${b.floor}`)).map(m=>{
+        const kb=m.sizeBytes?`${Math.max(1,Math.round(Number(m.sizeBytes)/1024))} KB`:'';
+        return `<div data-map-row="${attr(m.id)}" style="display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;margin-top:8px">
+          ${m.image?`<img src="${m.image}" alt="${attr(m.building)} ${attr(m.floor)}" style="width:64px;height:48px;object-fit:contain;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;flex:none">`:''}
+          <div style="flex:1;min-width:0">
+            <b>${esc(m.building)}</b>
+            <small style="display:block;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.floor)}${kb?' · '+esc(kb):''}${m.source?' · '+esc(m.source):''}</small>
+          </div>
+          <button type="button" class="secondary-btn" style="padding:7px 10px;font-size:12px" data-preview-map="${attr(m.id)}">View</button>
+          <button type="button" class="secondary-btn" style="padding:7px 10px;font-size:12px" data-replace="${attr(m.id)}">Replace</button>
+          <button type="button" class="danger-text" style="padding:7px 10px;font-size:12px;font-weight:700;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;cursor:pointer" data-delete="${attr(m.id)}">Delete</button>
+        </div>`;
+      }).join('');
+    };
 
     modal.innerHTML=`<div style="width:min(1050px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:20px;padding:20px;box-shadow:0 30px 80px rgba(0,0,0,.35);box-sizing:border-box">
-      <div style="display:flex;justify-content:space-between;gap:15px;align-items:flex-start"><div><h3 style="margin:0;font-size:20px">🏢 Indoor Map Manager</h3><p style="margin:5px 0 0;color:#64748b;font-size:12px">Upload, replace or delete floor maps. Buildings come from the campus directory.</p></div><button type="button" data-close style="border:0;background:#f1f5f9;border-radius:9px;font-size:22px;width:36px;height:36px;cursor:pointer">×</button></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px">
-        <label style="font-size:11px;font-weight:800;color:#475569">BUILDING<select id="indoorBuilding" style="display:block;width:100%;margin-top:6px;padding:11px;border:1px solid #cbd5e1;border-radius:9px;background:#fff"><option value="">Select a campus building</option>${options}</select></label>
-        <label style="font-size:11px;font-weight:800;color:#475569">OR NEW BUILDING<input id="indoorNewBuilding" placeholder="Only if not listed" style="display:block;width:100%;margin-top:6px;padding:11px;border:1px solid #cbd5e1;border-radius:9px;box-sizing:border-box"></label>
-        <label style="font-size:11px;font-weight:800;color:#475569">FLOOR<input id="indoorFloor" placeholder="e.g. 1st Floor" style="display:block;width:100%;margin-top:6px;padding:11px;border:1px solid #cbd5e1;border-radius:9px;box-sizing:border-box"></label>
-        <label style="font-size:11px;font-weight:800;color:#475569">MAP IMAGE<input id="indoorFile" type="file" accept="image/png,image/jpeg,image/webp" style="display:block;width:100%;margin-top:6px;padding:8px;border:1px solid #cbd5e1;border-radius:9px;box-sizing:border-box"></label>
-        <label style="grid-column:1/-1;font-size:11px;font-weight:800;color:#475569">SOURCE / NOTE<input id="indoorSource" placeholder="Optional note" style="display:block;width:100%;margin-top:6px;padding:11px;border:1px solid #cbd5e1;border-radius:9px;box-sizing:border-box"></label>
+      <div style="display:flex;justify-content:space-between;gap:15px;align-items:flex-start">
+        <div>
+          <h3 style="margin:0;font-size:20px">🏢 Indoor Map Manager</h3>
+          <p style="margin:5px 0 0;color:#64748b;font-size:12px">Add, preview, replace, or delete floor maps (PNG, JPG, WebP up to 4 MB).</p>
+        </div>
+        <button type="button" data-close style="border:0;background:#f1f5f9;border-radius:9px;font-size:22px;width:36px;height:36px;cursor:pointer">×</button>
       </div>
-      <button type="button" class="primary-btn" data-upload style="margin-top:12px">⬆️ Upload / Replace Map</button>
-      <div style="margin-top:18px"><h4 style="margin:0 0 8px">Uploaded Indoor Maps</h4>${rows}</div>
+      <div data-replace-banner hidden style="margin-top:12px;padding:10px 12px;border-radius:10px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <span data-replace-label></span>
+        <button type="button" class="secondary-btn" data-cancel-replace style="padding:5px 10px;font-size:11px">Cancel Replace</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">
+        <label style="font-size:11px;font-weight:800;color:#475569">BUILDING
+          <select id="indoorBuilding" style="display:block;width:100%;margin-top:6px;padding:11px;border:1px solid #cbd5e1;border-radius:9px;background:#fff"><option value="">Select a campus building</option>${options}</select>
+        </label>
+        <label style="font-size:11px;font-weight:800;color:#475569">OR NEW BUILDING
+          <input id="indoorNewBuilding" placeholder="Only if not listed" style="display:block;width:100%;margin-top:6px;padding:11px;border:1px solid #cbd5e1;border-radius:9px;box-sizing:border-box">
+        </label>
+        <div>
+          <label style="font-size:11px;font-weight:800;color:#475569">FLOOR
+            <input id="indoorFloor" placeholder="e.g. 1st Floor" style="display:block;width:100%;margin-top:6px;padding:11px;border:1px solid #cbd5e1;border-radius:9px;box-sizing:border-box">
+          </label>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">
+            ${floorPresets.map(fp=>`<button type="button" class="secondary-btn" data-floor-preset="${attr(fp)}" style="padding:4px 8px;font-size:10px">${esc(fp)}</button>`).join('')}
+          </div>
+        </div>
+        <label style="font-size:11px;font-weight:800;color:#475569">MAP IMAGE
+          <input id="indoorFile" type="file" accept="image/png,image/jpeg,image/webp" style="display:block;width:100%;margin-top:6px;padding:8px;border:1px solid #cbd5e1;border-radius:9px;box-sizing:border-box">
+        </label>
+        <label style="grid-column:1/-1;font-size:11px;font-weight:800;color:#475569">SOURCE / NOTE
+          <input id="indoorSource" placeholder="Optional note or blueprint source" style="display:block;width:100%;margin-top:6px;padding:11px;border:1px solid #cbd5e1;border-radius:9px;box-sizing:border-box">
+        </label>
+      </div>
+      <div data-preview-box hidden style="margin-top:12px;padding:10px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
+          <b style="font-size:12px;color:#0f172a">Selected Image Preview</b>
+          <small data-preview-meta style="color:#64748b;font-size:11px"></small>
+        </div>
+        <img data-preview-img alt="Selected indoor map preview" style="display:block;width:100%;max-height:220px;object-fit:contain;background:#fff;border-radius:8px;border:1px solid #e2e8f0">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <button type="button" class="primary-btn" data-upload>⬆️ Upload Map</button>
+        <button type="button" class="secondary-btn" data-clear-form>Clear Form</button>
+      </div>
+      <div style="margin-top:18px">
+        <h4 style="margin:0 0 8px">Uploaded Indoor Maps (<span data-map-count>${(this.indoorMaps||[]).length}</span>)</h4>
+        <div data-map-list>${renderRowsHtml()}</div>
+      </div>
     </div>`;
     document.body.appendChild(modal);
     document.body.style.overflow='hidden';
-    const close=()=>{modal.remove();document.body.style.overflow='';};
+
+    const close=()=>{modal.remove();document.body.style.overflow='';this.renderAdmin();};
     modal.querySelector('[data-close]').onclick=close;
     modal.onclick=e=>{if(e.target===modal)close();};
-    modal.querySelectorAll('[data-replace]').forEach(btn=>btn.onclick=()=>{
-      const m=maps.find(x=>String(x.id)===String(btn.dataset.replace)); if(!m)return;
-      const sel=modal.querySelector('#indoorBuilding');
-      if(allBuildings.includes(m.building)) sel.value=m.building; else modal.querySelector('#indoorNewBuilding').value=m.building;
-      modal.querySelector('#indoorFloor').value=m.floor||'';
-      modal.querySelector('#indoorSource').value=m.source||'';
-      modal.dataset.replaceId=m.id;
-      this.toast(`Ready to replace ${m.building} · ${m.floor}.`);
+
+    const banner=modal.querySelector('[data-replace-banner]');
+    const bannerLabel=modal.querySelector('[data-replace-label]');
+    const uploadBtn=modal.querySelector('[data-upload]');
+    const previewBox=modal.querySelector('[data-preview-box]');
+    const previewImg=modal.querySelector('[data-preview-img]');
+    const previewMeta=modal.querySelector('[data-preview-meta]');
+    const fileInput=modal.querySelector('#indoorFile');
+
+    const syncReplaceState=()=>{
+      const repId=modal.dataset.replaceId||'';
+      const target=(this.indoorMaps||[]).find(x=>String(x.id)===String(repId));
+      if(target){
+        banner.hidden=false;
+        bannerLabel.textContent=`Replacing existing map: ${target.building} · ${target.floor}`;
+        uploadBtn.textContent='🔄 Save Replacement Map';
+      }else{
+        delete modal.dataset.replaceId;
+        banner.hidden=true;
+        bannerLabel.textContent='';
+        uploadBtn.textContent='⬆️ Upload Map';
+      }
+    };
+
+    const resetForm=()=>{
+      delete modal.dataset.replaceId;
+      modal.querySelector('#indoorBuilding').value='';
+      modal.querySelector('#indoorNewBuilding').value='';
+      modal.querySelector('#indoorFloor').value='';
+      modal.querySelector('#indoorSource').value='';
+      fileInput.value='';
+      previewBox.hidden=true;
+      previewImg.removeAttribute('src');
+      previewMeta.textContent='';
+      syncReplaceState();
+    };
+
+    modal.querySelector('[data-cancel-replace]').onclick=()=>{delete modal.dataset.replaceId;syncReplaceState();};
+    modal.querySelector('[data-clear-form]').onclick=resetForm;
+
+    modal.querySelectorAll('[data-floor-preset]').forEach(btn=>{
+      btn.onclick=()=>{modal.querySelector('#indoorFloor').value=btn.dataset.floorPreset;};
     });
-    modal.querySelectorAll('[data-delete]').forEach(btn=>btn.onclick=async()=>{
-      const m=maps.find(x=>String(x.id)===String(btn.dataset.delete)); if(!m)return;
-      if(!confirm(`Delete the indoor map for ${m.building} · ${m.floor}?`))return;
-      const ok=await this.deleteIndoorMap(m.id); if(ok){close();this.openIndoorMapManager();}
-    });
+
+    fileInput.onchange=()=>{
+      const f=fileInput.files?.[0];
+      if(!f){previewBox.hidden=true;return;}
+      const url=URL.createObjectURL(f);
+      previewImg.onload=()=>{
+        const kb=Math.max(1,Math.round(f.size/1024));
+        previewMeta.textContent=`${f.name} · ${previewImg.naturalWidth}×${previewImg.naturalHeight}px · ${kb} KB`;
+        URL.revokeObjectURL(url);
+      };
+      previewImg.src=url;
+      previewBox.hidden=false;
+    };
+
+    const refreshList=()=>{
+      const listEl=modal.querySelector('[data-map-list]');
+      const countEl=modal.querySelector('[data-map-count]');
+      if(listEl) listEl.innerHTML=renderRowsHtml();
+      if(countEl) countEl.textContent=String((this.indoorMaps||[]).length);
+      bindRowActions();
+    };
+
+    const bindRowActions=()=>{
+      modal.querySelectorAll('[data-preview-map]').forEach(btn=>{
+        btn.onclick=()=>{
+          const m=(this.indoorMaps||[]).find(x=>String(x.id)===String(btn.dataset.previewMap));
+          if(m) this.openIndoorGuide(m.building, m.floor);
+        };
+      });
+      modal.querySelectorAll('[data-replace]').forEach(btn=>{
+        btn.onclick=()=>{
+          const m=(this.indoorMaps||[]).find(x=>String(x.id)===String(btn.dataset.replace));
+          if(!m)return;
+          const sel=modal.querySelector('#indoorBuilding');
+          if(allBuildings.includes(m.building)){sel.value=m.building;modal.querySelector('#indoorNewBuilding').value='';}
+          else{sel.value='';modal.querySelector('#indoorNewBuilding').value=m.building;}
+          modal.querySelector('#indoorFloor').value=m.floor||'';
+          modal.querySelector('#indoorSource').value=m.source||'';
+          modal.dataset.replaceId=m.id;
+          syncReplaceState();
+          this.toast(`Ready to replace ${m.building} · ${m.floor}. Select a new image and save.`);
+        };
+      });
+      modal.querySelectorAll('[data-delete]').forEach(btn=>{
+        btn.onclick=async()=>{
+          const m=(this.indoorMaps||[]).find(x=>String(x.id)===String(btn.dataset.delete));
+          if(!m)return;
+          if(!confirm(`Delete the indoor map for ${m.building} · ${m.floor}?`))return;
+          btn.disabled=true;
+          btn.textContent='Deleting…';
+          const ok=await this.deleteIndoorMap(m.id);
+          if(ok){
+            if(modal.dataset.replaceId===m.id) delete modal.dataset.replaceId;
+            syncReplaceState();
+            refreshList();
+            this.renderAdmin();
+          }else{
+            btn.disabled=false;
+            btn.textContent='Delete';
+          }
+        };
+      });
+    };
+
+    bindRowActions();
+
     modal.querySelector('[data-upload]').onclick=async()=>{
-      const building=(modal.querySelector('#indoorNewBuilding').value.trim()||modal.querySelector('#indoorBuilding').value.trim());
-      const floor=modal.querySelector('#indoorFloor').value.trim();
-      const file=modal.querySelector('#indoorFile').files[0];
+      const building=(modal.querySelector('#indoorNewBuilding').value.trim()||modal.querySelector('#indoorBuilding').value.trim()).replace(/\s+/g,' ');
+      const floor=modal.querySelector('#indoorFloor').value.trim().replace(/\s+/g,' ');
+      const file=fileInput.files?.[0];
       const source=modal.querySelector('#indoorSource').value.trim();
       if(!building||!floor||!file){this.toast('Choose a building, floor and map image.');return;}
+      uploadBtn.disabled=true;
+      const prevLabel=uploadBtn.textContent;
+      uploadBtn.textContent='Uploading…';
       try{
         this.toast('Preparing indoor map…');
         const image=await this.optimizeIndoorImage(file);
-        const payload={id:modal.dataset.replaceId||`im_${Date.now()}`,building,floor,title:building,source:source||file.name,image,note:`Indoor floor map for ${floor}.`};
+        const payload={
+          id:modal.dataset.replaceId||`im_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,
+          building,
+          floor,
+          title:building,
+          source:source||file.name,
+          image,
+          note:`Indoor floor map for ${floor}.`
+        };
         const ok=await this.saveIndoorMap(payload);
-        if(ok){close();this.renderAdmin();this.toast('Indoor map uploaded and synced.');}
-      }catch(e){console.error(e);this.toast(e?.message||'Unable to upload the map.');}
+        if(ok){
+          resetForm();
+          refreshList();
+          this.renderAdmin();
+          this.toast('Indoor map uploaded and synced.');
+        }
+      }catch(e){
+        console.error(e);
+        this.toast(e?.message||'Unable to upload the map.');
+      }finally{
+        uploadBtn.disabled=false;
+        uploadBtn.textContent=prevLabel;
+      }
     };
   },
   openIndoorMapsForUsers(){
@@ -1134,7 +1271,15 @@ async init() {
     };
     modal.querySelector('#userIndoorBuilding')?.addEventListener('change',renderBuilding);
   },
+  estimateDataUrlBytes(dataUrl){
+    const comma=String(dataUrl||'').indexOf(',');
+    if(comma<0) return 0;
+    const b64=String(dataUrl||'').slice(comma+1);
+    const pad=(b64.match(/=+$/)||[''])[0].length;
+    return Math.max(0,Math.floor((b64.length*3)/4)-pad);
+  },
   optimizeIndoorImage(file){
+    const MAX_BYTES=4*1024*1024;
     return new Promise((resolve,reject)=>{
       const reader=new FileReader();
       reader.onerror=()=>reject(new Error("Could not read the image."));
@@ -1142,12 +1287,16 @@ async init() {
         const img=new Image();
         img.onerror=()=>reject(new Error("The selected file is not a supported image."));
         img.onload=()=>{
-          const max=1800;
+          const max=2000;
           const scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
           const w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale));
           const c=document.createElement("canvas");c.width=w;c.height=h;
           const ctx=c.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);
-          resolve(c.toDataURL("image/webp",0.84));
+          for(const q of [0.88,0.78,0.68,0.58]){
+            const out=c.toDataURL("image/webp",q);
+            if(this.estimateDataUrlBytes(out)<=MAX_BYTES) return resolve(out);
+          }
+          reject(new Error("Image is still larger than 4 MB after compression. Please choose a smaller file."));
         };
         img.src=reader.result;
       };
@@ -1156,22 +1305,41 @@ async init() {
   },
   async saveIndoorMap(mapData){
     const old=[...(this.indoorMaps||[])];
-    this.indoorMaps=this.indoorMaps.filter(m=>!(m.building===mapData.building&&m.floor===mapData.floor)&&m.id!==mapData.id);
-    this.indoorMaps.push(mapData);
+    const bKey=this.normalizeIndoorValue(mapData.building);
+    const fKey=this.normalizeIndoorValue(mapData.floor);
+    const enriched={...mapData,sizeBytes:mapData.sizeBytes||this.estimateDataUrlBytes(mapData.image)};
+    this.indoorMaps=this.indoorMaps.filter(m=>!(this.normalizeIndoorValue(m.building)===bKey&&this.normalizeIndoorValue(m.floor)===fKey)&&m.id!==enriched.id);
+    this.indoorMaps.push(enriched);
     localStorage.setItem("campus_indoor_maps_v2",JSON.stringify(this.indoorMaps));
     this.applyIndoorMaps();
     if(!this.adminToken){this.toast("Map saved on this device. Log in as admin to sync.");return true;}
     try{
-      const res=await fetch("/api/indoor-maps",{method:"PUT",headers:{"Content-Type":"application/json","x-admin-token":this.adminToken},body:JSON.stringify(mapData)});
+      const res=await fetch("/api/indoor-maps",{method:"PUT",headers:{"Content-Type":"application/json","x-admin-token":this.adminToken},body:JSON.stringify(enriched)});
       if(res.status===401){this.indoorMaps=old;this.applyIndoorMaps();sessionStorage.removeItem("admin_token");this.adminToken="";this.toast("Admin session expired. Please log in again.");return false;}
-      if(!res.ok)throw new Error("server sync failed");
+      if(!res.ok){
+        let errMsg="server sync failed";
+        try{const errData=await res.json();if(errData?.error)errMsg=errData.error;}catch{}
+        throw new Error(errMsg);
+      }
       await this.loadIndoorMapsFromServer();
       return true;
-    }catch(e){this.indoorMaps=old;this.applyIndoorMaps();localStorage.setItem("campus_indoor_maps_v2",JSON.stringify(old));this.toast("Map was not synced to the server.");return false;}
+    }catch(e){
+      this.indoorMaps=old;
+      this.applyIndoorMaps();
+      localStorage.setItem("campus_indoor_maps_v2",JSON.stringify(old));
+      this.toast(e?.message||"Map was not synced to the server.");
+      return false;
+    }
   },
   async deleteIndoorMap(id){
     const old=[...(this.indoorMaps||[])];
+    const oldPlaces=[...(this.places||[])];
     this.indoorMaps=this.indoorMaps.filter(m=>m.id!==id);
+    const affectedPlaces=this.places.some(p=>String(p?.indoorMapId||'')===String(id));
+    if(affectedPlaces){
+      this.places=this.places.map(p=>String(p?.indoorMapId||'')===String(id)?{...p,indoorMapId:""}:p);
+      localStorage.setItem("campus_places",JSON.stringify(this.places));
+    }
     localStorage.setItem("campus_indoor_maps_v2",JSON.stringify(this.indoorMaps));
     this.applyIndoorMaps();
     if(!this.adminToken){this.toast("Deleted on this device. Log in as admin to sync.");return true;}
@@ -1180,8 +1348,18 @@ async init() {
       if(res.status===401)throw new Error("session");
       if(!res.ok)throw new Error("delete failed");
       await this.loadIndoorMapsFromServer();
+      if(affectedPlaces) await this.save();
+      this.toast("Indoor map deleted.");
       return true;
-    }catch(e){this.indoorMaps=old;this.applyIndoorMaps();localStorage.setItem("campus_indoor_maps_v2",JSON.stringify(old));this.toast(e.message==="session"?"Admin session expired. Please log in again.":"Could not delete the server map.");return false;}
+    }catch(e){
+      this.indoorMaps=old;
+      this.places=oldPlaces;
+      this.applyIndoorMaps();
+      localStorage.setItem("campus_indoor_maps_v2",JSON.stringify(old));
+      localStorage.setItem("campus_places",JSON.stringify(oldPlaces));
+      this.toast(e.message==="session"?"Admin session expired. Please log in again.":"Could not delete the server map.");
+      return false;
+    }
   },
   openRouteManager(){
     const modal=document.createElement("div");modal.className="modal";
@@ -1329,17 +1507,6 @@ async init() {
   importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d))throw 0;this.places=d;this.save();this.renderAdmin();this.renderMarkers();this.renderPlaces();this.renderPopular();this.renderCategories();this.toast("Locations imported.");}catch{this.toast("Invalid JSON file.");}};r.readAsText(f);},
   install(){if(this.deferredInstall){this.deferredInstall.prompt();this.deferredInstall=null;}},
   registerPWA(){if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});},
-initDarkMode(){
-  const stored = localStorage.getItem("darkMode");
-  const dark = stored === "true";
-  document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
-  this.darkMode = dark;
-},
-toggleDarkMode(){
-  this.darkMode = !this.darkMode;
-  localStorage.setItem("darkMode", this.darkMode);
-  document.documentElement.setAttribute("data-theme", this.darkMode ? "dark" : "light");
-},
   icon(cat){return ({Laboratory:"🧪",Classroom:"🏫",Office:"👨‍💼",Facility:"⭐",Building:"🏢"})[cat]||"📍";},
   escape(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));},
   escapeAttr(s){return this.escape(s).replace(/`/g,"&#96;");},
