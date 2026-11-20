@@ -177,6 +177,23 @@ body.dark .chip.active, html.dark .chip.active, [data-theme="dark"] .chip.active
   border-color: #2563eb !important;
 }
 
+
+body.dark .ai-campus-section, html.dark .ai-campus-section, [data-theme="dark"] .ai-campus-section {
+  background: linear-gradient(135deg, #1e1b4b, #0f172a) !important;
+  border-color: #3730a3 !important;
+}
+body.dark .ai-campus-section h2, html.dark .ai-campus-section h2, [data-theme="dark"] .ai-campus-section h2 {
+  color: #f8fafc !important;
+}
+body.dark .ai-campus-section p, html.dark .ai-campus-section p, [data-theme="dark"] .ai-campus-section p {
+  color: #cbd5e1 !important;
+}
+body.dark .ai-example-chips button, html.dark .ai-example-chips button, [data-theme="dark"] .ai-example-chips button {
+  background: #1e293b !important;
+  color: #c7d2fe !important;
+  border-color: #4338ca !important;
+}
+
 </style>
 </head>
 <body>
@@ -194,6 +211,7 @@ body.dark .chip.active, html.dark .chip.active, [data-theme="dark"] .chip.active
     <div class="top-actions">
       <button class="icon-btn" title="Install app" id="installBtn" hidden>⇩</button>
       <button class="icon-btn" title="My location" onclick="app.locate()">⌖</button>
+      <button class="icon-btn" id="themeToggleBtn" title="Switch theme" aria-label="Switch dark or light mode" onclick="app.toggleTheme()">🌙</button>
       <button class="icon-btn" title="Admin" onclick="app.openAdmin()">⚙</button>
     </div>
   </header>
@@ -219,15 +237,32 @@ body.dark .chip.active, html.dark .chip.active, [data-theme="dark"] .chip.active
       </div>
 
       <div class="quick-grid">
-        
         <button onclick="app.openCategories('Classroom')"><b>🏫</b><span>Classrooms</span></button>
         <button onclick="app.openCategories('Laboratory')"><b>🧪</b><span>Laboratories</span></button>
         <button onclick="app.openCategories('Office')"><b>👨‍💼</b><span>Offices</span></button>
         <button onclick="app.openCategories('Facility')"><b>⭐</b><span>Facilities</span></button>
+        <button onclick="app.openDepartments()"><b>🏛️</b><span>Departments</span></button>
         <button onclick="app.show('favorites')"><b>♥</b><span>Favorites</span></button>
       </div>
 
-<div id="userIndoorSection" class="campus-media" hidden>
+      <section class="ai-campus-section" aria-labelledby="aiCampusTitle">
+        <div class="ai-campus-copy">
+          <div class="assistant-avatar ai-large">AI</div>
+          <div>
+            <span class="eyebrow">INDOOR CAMPUS HELP</span>
+            <h2 id="aiCampusTitle">Ask AI where anything is</h2>
+            <p>Ask about classrooms, labs, offices and facilities. The assistant uses your campus information and uploaded indoor floor maps to identify the building, floor and location and give practical directions.</p>
+            <div class="ai-example-chips">
+              <button type="button" onclick="app.askExample('Where is LH-01?')">Where is LH-01?</button>
+              <button type="button" onclick="app.askExample('Which floor is the Computer Lab?')">Which floor is the Computer Lab?</button>
+              <button type="button" onclick="app.askExample('How do I reach LH-201?')">How do I reach LH-201?</button>
+            </div>
+          </div>
+          <button class="ai-open-btn" type="button" onclick="app.openAssistant()">Ask AI →</button>
+        </div>
+      </section>
+
+      <div id="userIndoorSection" class="campus-media" hidden>
         <div class="section-head"><h2>Indoor Maps</h2><span class="eyebrow">ADMIN MAPS</span></div>
         <div id="userIndoorList" class="place-grid"></div>
       </div>

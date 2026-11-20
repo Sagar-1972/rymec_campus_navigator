@@ -74,6 +74,7 @@ async init() {
         this.campusRoutes = cachedRoutes;
       }
     } catch {}
+    this.initTheme();
     document.title = CAMPUS_CONFIG.name + " | Campus Navigator";
     $("#brandName").textContent = CAMPUS_CONFIG.shortName;
     this.renderPopular();
@@ -338,6 +339,100 @@ async init() {
 
   filterPlaces(v) {
     this.renderPlaces(v, this.currentPlacesCategory || "All");
+  },
+
+  initTheme() {
+    const saved = localStorage.getItem("campus_theme");
+    const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const isDark = saved ? saved === "dark" : false;
+    this.applyTheme(isDark ? "dark" : "light");
+  },
+
+  applyTheme(mode) {
+    const dark = mode === "dark";
+    document.documentElement.classList.toggle("dark", dark);
+    document.body.classList.toggle("dark", dark);
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    const btn = document.getElementById("themeToggleBtn");
+    if (btn) {
+      btn.textContent = dark ? "☀️" : "🌙";
+      btn.title = dark ? "Switch to light mode" : "Switch to dark mode";
+      btn.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
+    }
+  },
+
+  toggleTheme() {
+    const isDark = document.body.classList.contains("dark") || document.documentElement.classList.contains("dark");
+    const next = isDark ? "light" : "dark";
+    try { localStorage.setItem("campus_theme", next); } catch {}
+    this.applyTheme(next);
+  },
+
+  openDepartments() {
+    const existing = document.getElementById("departmentsModal");
+    if (existing) existing.remove();
+
+    const defaultDepts = [
+      { name: "Computer Science & Engineering (CSE)", block: "CS/ES/IS Block", query: "CSE" },
+      { name: "Information Science & Engineering (ISE)", block: "CS/ES/IS Block", query: "IS" },
+      { name: "Electronics & Communication Engineering (ECE)", block: "Main Block", query: "Electronics" },
+      { name: "Electrical & Electronics Engineering (EEE)", block: "Electrical Block", query: "Electrical" },
+      { name: "Mechanical Engineering", block: "Mechanical Block", query: "Mechanical" },
+      { name: "Civil Engineering", block: "Civil Engineering Block", query: "Civil" },
+      { name: "Master of Business Administration (MBA)", block: "Main Block", query: "MBA" },
+      { name: "First Year / Basic Sciences (Physics, Chemistry, Maths)", block: "Main Block", query: "Department" }
+    ];
+
+    const dirDepts = (Array.isArray(this.places) ? this.places : [])
+      .filter(p => /department|hod|cse|ise|ece|eee|mech|civil|mba/i.test(`${p.name} ${p.category} ${p.building} ${p.description}`))
+      .map(p => ({
+        name: p.name,
+        block: `${p.building || "Campus"}${p.floor ? " · " + p.floor : ""}`,
+        placeId: p.id,
+        query: p.building || p.name
+      }));
+
+    const seen = new Set();
+    const list = [];
+    for (const d of [...dirDepts, ...defaultDepts]) {
+      const key = d.name.toLowerCase().trim();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      list.push(d);
+    }
+
+    const modal = document.createElement("div");
+    modal.id = "departmentsModal";
+    modal.className = "modal";
+    modal.innerHTML = `<div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h3>🏛️ Academic Departments</h3>
+          <p class="muted" style="margin:4px 0 0">Select a department to view details or find its block and rooms.</p>
+        </div>
+        <button type="button" data-close>×</button>
+      </div>
+      <div style="display:grid;gap:9px;margin-top:14px">
+        ${list.map(d => `<div class="place-card" style="margin:0" ${d.placeId ? `data-place-id="${this.escapeAttr(d.placeId)}"` : `data-dept-query="${this.escapeAttr(d.query)}"`}>
+          <div class="place-icon office">🏛️</div>
+          <div class="place-info">
+            <h3>${this.escape(d.name)}</h3>
+            <p>${this.escape(d.block)}</p>
+          </div>
+          <span style="color:#2563eb;font-weight:800;font-size:12px">Explore →</span>
+        </div>`).join("")}
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+    const close = () => modal.remove();
+    modal.querySelector("[data-close]").onclick = close;
+    modal.onclick = e => { if (e.target === modal) close(); };
+    modal.querySelectorAll("[data-place-id]").forEach(el => {
+      el.onclick = () => { const id = el.dataset.placeId; close(); this.showDetails(id); };
+    });
+    modal.querySelectorAll("[data-dept-query]").forEach(el => {
+      el.onclick = () => { const q = el.dataset.deptQuery; close(); this.search(q); };
+    });
   },
 
   openCategories(cat) {
